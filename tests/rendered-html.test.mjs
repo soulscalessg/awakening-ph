@@ -134,6 +134,25 @@ test("registration starts with an accessible ticket-selection step", async () =>
   assert.match(html, /Continue to Details/);
 });
 
+test("publishes the complete new schedule batch with international and multi-day dates", async () => {
+  const html = await renderedHtml("/latest-schedules");
+
+  for (const destination of [
+    "Olongapo",
+    "La Union",
+    "Tarlac",
+    "United Kingdom",
+    "Koronadal",
+    "Singapore",
+    "Tagaytay",
+    "Quezon",
+  ]) {
+    assert.match(html, new RegExp(destination));
+  }
+  assert.match(html, /October 26–31, 2026/);
+  assert.match(html, /November 20–23, 2026/);
+});
+
 test("protects the operations platform behind the admin login", async () => {
   for (const pathname of [
     "/platform",

@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabaseRequest } from "../../supabase-server";
+import { scheduleOptionLabel, type PublicSchedule } from "../../schedule-format";
 
 export const dynamic = "force-dynamic";
 
@@ -29,15 +30,19 @@ export async function POST(request: Request) {
     const name = text(payload.name, 160);
     const email = text(payload.email, 254).toLowerCase();
     const phone = text(payload.phone, 40);
-    const eventDate = text(payload.event_date, 300);
+    const submittedEventDate = text(payload.event_date, 300);
+    const scheduleId = text(payload.schedule_id, 80);
     const paymentMethod = text(payload.payment_method, 20).toLowerCase();
     const paymentReference = text(payload.payment_reference, 120);
     const paymentProofName = text(payload.payment_proof_name, 220);
     const paymentProofData = String(payload.payment_proof_data ?? "");
     const quantity = Math.min(20, Math.max(1, Math.trunc(Number(payload.quantity) || 1)));
 
-    if (!name || !email || !phone || !eventDate || !paymentReference || !paymentProofName || !paymentProofData) {
+    if (!name || !email || !phone || !submittedEventDate || !scheduleId || !paymentReference || !paymentProofName || !paymentProofData) {
       return Response.json({ error: "Required registration details are missing." }, { status: 400 });
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(scheduleId)) {
+      return Response.json({ error: "Choose a valid published schedule." }, { status: 400 });
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return Response.json({ error: "Enter a valid email address." }, { status: 400 });
@@ -49,6 +54,18 @@ export async function POST(request: Request) {
       return Response.json({ error: "Upload a valid payment proof image smaller than 3 MB." }, { status: 400 });
     }
 
+    const matchingSchedules = await supabaseRequest<PublicSchedule[]>(
+      `awakening_schedules?select=id,event_at,ends_at,venue,city,capacity,status,timezone,country_code&id=eq.${encodeURIComponent(scheduleId)}&status=eq.scheduled&limit=1`,
+    );
+    const matchingSchedule = matchingSchedules[0];
+    if (!matchingSchedule) {
+      return Response.json(
+        { error: "That schedule is no longer available. Please select another date." },
+        { status: 409 },
+      );
+    }
+    const eventDate = scheduleOptionLabel(matchingSchedule);
+
     const existing = await findExistingRegistration(email, paymentReference);
     if (existing) {
       return Response.json({ data: existing, duplicate: true }, { status: 200 });
@@ -58,6 +75,7 @@ export async function POST(request: Request) {
       name,
       email,
       phone,
+      schedule_id: scheduleId,
       event_date: eventDate,
       quantity,
       total_amount: TICKET_PRICE * quantity,

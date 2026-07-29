@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { formatScheduleRange, scheduleFlag, type PublicSchedule } from "../schedule-format";
 
 type PlatformPage =
   | "system-information"
@@ -18,12 +19,29 @@ type PlatformPage =
   | "applications-sponsorship";
 
 const schedules = [
-  ["2026-05-30T09:00:00+08:00", "Davao", "scheduled"],
-  ["2026-05-31T09:00:00+08:00", "General Santos", "scheduled"],
-  ["2026-06-20T09:00:00+08:00", "House of Transformation, Ayala the 30th, Pasig", "scheduled"],
-  ["2026-07-18T09:00:00+08:00", "House of Transformation, Ayala the 30th, Pasig", "scheduled"],
-  ["2026-07-27T09:00:00+08:00", "Cebu", "scheduled"],
-  ["2026-08-15T09:00:00+08:00", "House of Transformation, Ayala the 30th, Pasig", "scheduled"],
+  { event_at: "2026-05-30T09:00:00+08:00", venue: "Davao", city: "Davao", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-05-31T09:00:00+08:00", venue: "General Santos", city: "General Santos", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-06-20T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Pasig", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-07-18T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Pasig", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-07-27T09:00:00+08:00", venue: "Cebu", city: "Cebu", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-08-15T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-08-22T09:00:00+08:00", venue: "Manila", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-08-22T09:00:00+08:00", venue: "Olongapo", city: "Olongapo", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-09-06T09:00:00+08:00", venue: "La Union", city: "La Union", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-09-12T09:00:00+08:00", venue: "Rizal", city: "Rizal", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-09-20T09:00:00+08:00", venue: "Manila", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-09-26T09:00:00+08:00", venue: "Pampanga", city: "Pampanga", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-10-03T09:00:00+08:00", venue: "Tarlac", city: "Tarlac", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-10-03T09:00:00+08:00", venue: "Manila", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-10-11T09:00:00+01:00", venue: "United Kingdom", city: "United Kingdom", status: "scheduled", timezone: "Europe/London", country_code: "GB" },
+  { event_at: "2026-10-17T09:00:00+08:00", venue: "Laguna", city: "Laguna", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-10-26T09:00:00+08:00", ends_at: "2026-10-31T17:00:00+08:00", venue: "Koronadal", city: "Koronadal", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-11-01T09:00:00+08:00", venue: "Tagaytay", city: "Tagaytay", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-11-07T09:00:00+08:00", venue: "Marikina", city: "Marikina", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-11-20T09:00:00+08:00", ends_at: "2026-11-23T17:00:00+08:00", venue: "Singapore", city: "Singapore", status: "scheduled", timezone: "Asia/Singapore", country_code: "SG" },
+  { event_at: "2026-11-21T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-11-28T09:00:00+08:00", venue: "Quezon", city: "Quezon", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { event_at: "2026-12-05T09:00:00+08:00", venue: "Manila", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
 ] as const;
 
 const registrants = [
@@ -51,6 +69,7 @@ type StoredRecord = {
   phone?: string;
   venue?: string;
   event_at?: string;
+  ends_at?: string | null;
   event_date?: string;
   code?: string;
   status?: string;
@@ -59,6 +78,9 @@ type StoredRecord = {
   total_amount?: number | string;
   city?: string;
   capacity?: number;
+  timezone?: string;
+  country_code?: string;
+  schedule_id?: string;
   business_name?: string;
   industry?: string;
   employee_count?: number;
@@ -77,6 +99,77 @@ type StoredRecord = {
   notes?: string;
   [key: string]: unknown;
 };
+
+function asPublicSchedule(record: StoredRecord): PublicSchedule {
+  return {
+    id: String(record.id ?? `${record.event_at}-${record.venue}`),
+    event_at: String(record.event_at ?? ""),
+    ends_at: record.ends_at ? String(record.ends_at) : null,
+    venue: String(record.venue ?? "Venue pending"),
+    city: record.city ? String(record.city) : null,
+    capacity: Number(record.capacity) || null,
+    status: String(record.status ?? "scheduled"),
+    timezone: String(record.timezone ?? "Asia/Manila"),
+    country_code: String(record.country_code ?? "PH"),
+  };
+}
+
+function formatRecordPart(record: StoredRecord, options: Intl.DateTimeFormatOptions) {
+  if (!record.event_at) return "";
+  return new Intl.DateTimeFormat("en-PH", {
+    ...options,
+    timeZone: String(record.timezone ?? "Asia/Manila"),
+  }).format(new Date(record.event_at));
+}
+
+function toZonedDateTimeLocal(iso: unknown, timeZone: unknown) {
+  if (!iso) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: String(timeZone || "Asia/Manila"),
+  }).formatToParts(new Date(String(iso)));
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value || "";
+  return `${value("year")}-${value("month")}-${value("day")}T${value("hour")}:${value("minute")}`;
+}
+
+function zonedDateTimeToIso(localValue: string, timeZone: string) {
+  if (!localValue) return null;
+  const [datePart, timePart] = localValue.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute] = timePart.split(":").map(Number);
+  const desired = Date.UTC(year, month - 1, day, hour, minute);
+  let guess = desired;
+  for (let index = 0; index < 3; index += 1) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+      timeZone,
+    }).formatToParts(new Date(guess));
+    const value = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((part) => part.type === type)?.value || 0);
+    const represented = Date.UTC(
+      value("year"),
+      value("month") - 1,
+      value("day"),
+      value("hour"),
+      value("minute"),
+      value("second"),
+    );
+    guess += desired - represented;
+  }
+  return new Date(guess).toISOString();
+}
 
 function usePlatformRecords(resource: string, initial: StoredRecord[] = []) {
   const [records, setRecords] = useState<StoredRecord[]>(initial);
@@ -267,10 +360,10 @@ function Modal({ title, onClose, onSave }: { title: string; onClose: () => void;
 function ScheduleModal({ record, onClose, onSave }: { record?: StoredRecord; onClose: () => void; onSave: (payload: StoredRecord) => Promise<void> }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const localEventAt = record?.event_at ? (() => {
-    const date = new Date(record.event_at);
-    return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-  })() : "";
+  const [timeZone, setTimeZone] = useState(String(record?.timezone ?? "Asia/Manila"));
+  const [countryCode, setCountryCode] = useState(String(record?.country_code ?? "PH"));
+  const localEventAt = toZonedDateTimeLocal(record?.event_at, timeZone);
+  const localEndsAt = toZonedDateTimeLocal(record?.ends_at, timeZone);
 
   return (
     <div className="platform-modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -279,19 +372,28 @@ function ScheduleModal({ record, onClose, onSave }: { record?: StoredRecord; onC
         const data = new FormData(event.currentTarget);
         setSaving(true);
         setError("");
+        const selectedTimeZone = String(data.get("timezone") || "Asia/Manila");
+        const endValue = String(data.get("ends_at") || "");
         void onSave({
-          event_at: new Date(String(data.get("event_at"))).toISOString(),
+          event_at: zonedDateTimeToIso(String(data.get("event_at")), selectedTimeZone) ?? undefined,
+          ends_at: endValue ? zonedDateTimeToIso(endValue, selectedTimeZone) : null,
           venue: String(data.get("venue")),
           city: String(data.get("city")),
           capacity: Math.max(0, Number(data.get("capacity")) || 0),
           status: String(data.get("status") || "scheduled"),
+          timezone: selectedTimeZone,
+          country_code: String(data.get("country_code") || "PH"),
         }).catch(() => setError("This schedule could not be saved. Please check the details and try again.")).finally(() => setSaving(false));
       }} onMouseDown={(event) => event.stopPropagation()}>
         <header><div><span className="admin-eyebrow">Public schedule</span><h2>{record ? "Edit session" : "Create a session"}</h2></div><button type="button" aria-label="Close" onClick={onClose}>×</button></header>
         <p>Publishing a session updates Latest Schedules and Secure My Slot automatically.</p>
-        <label>Date and time<input name="event_at" type="datetime-local" required defaultValue={localEventAt} /></label>
+        <div className="schedule-editor-grid"><label>Starts<input name="event_at" type="datetime-local" required defaultValue={localEventAt} /></label><label>Ends (optional)<input name="ends_at" type="datetime-local" defaultValue={localEndsAt} /></label></div>
         <label>Venue<input name="venue" required defaultValue={record?.venue ?? ""} placeholder="House of Transformation, Ayala the 30th" /></label>
         <div className="schedule-editor-grid"><label>City<input name="city" defaultValue={record?.city ?? ""} placeholder="Pasig" /></label><label>Capacity<input name="capacity" type="number" min="0" defaultValue={record?.capacity ?? ""} placeholder="100" /></label></div>
+        <div className="schedule-editor-grid">
+          <label>Country<select name="country_code" value={countryCode} onChange={(event) => { const value = event.target.value; setCountryCode(value); setTimeZone(value === "GB" ? "Europe/London" : value === "SG" ? "Asia/Singapore" : "Asia/Manila"); }}><option value="PH">Philippines 🇵🇭</option><option value="GB">United Kingdom 🇬🇧</option><option value="SG">Singapore 🇸🇬</option></select></label>
+          <label>Time zone<select name="timezone" value={timeZone} onChange={(event) => setTimeZone(event.target.value)}><option value="Asia/Manila">Asia / Manila</option><option value="Asia/Singapore">Asia / Singapore</option><option value="Europe/London">Europe / London</option></select></label>
+        </div>
         <label>Publishing status<select name="status" defaultValue={record?.status ?? "scheduled"}><option value="scheduled">Published</option><option value="draft">Draft</option><option value="cancelled">Cancelled</option></select></label>
         {error && <div className="platform-inline-error" role="alert">{error}</div>}
         <footer><button type="button" onClick={onClose}>Cancel</button><button className="platform-primary" type="submit" disabled={saving}>{saving ? "Saving…" : record ? "Save changes" : "Publish schedule"}</button></footer>
@@ -302,10 +404,13 @@ function ScheduleModal({ record, onClose, onSave }: { record?: StoredRecord; onC
 
 type ExtractedSchedule = {
   event_at: string;
+  ends_at: string | null;
   venue: string;
   city: string;
   capacity: number;
   status: string;
+  timezone: string;
+  country_code: string;
 };
 
 const scheduleMonths: Record<string, number> = {
@@ -314,7 +419,7 @@ const scheduleMonths: Record<string, number> = {
   sep: 8, sept: 8, october: 9, oct: 9, november: 10, nov: 10, december: 11, dec: 11,
 };
 
-const philippineCities = ["Manila", "Pasig", "Cebu", "Davao", "Baguio", "Pampanga", "Laguna", "Marikina", "Quezon", "Rizal", "Olongapo", "General Santos", "Makati", "Taguig", "Mandaluyong", "Cavite", "Batangas", "Iloilo", "Bacolod"];
+const philippineCities = ["Manila", "Pasig", "Cebu", "Davao", "Baguio", "Pampanga", "Laguna", "Marikina", "Quezon", "Rizal", "Olongapo", "La Union", "Tarlac", "Tagaytay", "Koronadal", "General Santos", "Makati", "Taguig", "Mandaluyong", "Cavite", "Batangas", "Iloilo", "Bacolod"];
 
 function toLocalDateTimeValue(date: Date) {
   const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -323,6 +428,31 @@ function toLocalDateTimeValue(date: Date) {
 
 function parseScheduleSource(source: string): ExtractedSchedule[] {
   const cleaned = source.replace(/\r/g, "\n").replace(/[•●▪◦]/g, "\n").replace(/\n{2,}/g, "\n");
+  const headingRecords: ExtractedSchedule[] = [];
+  let headingMonth: number | null = null;
+  let headingYear = new Date().getFullYear();
+  for (const rawLine of cleaned.split("\n")) {
+    const line = rawLine.trim();
+    const heading = line.match(/^(january|february|march|april|may|june|july|august|september|october|november|december)(?:\s+(\d{4}))?$/i);
+    if (heading) {
+      headingMonth = scheduleMonths[heading[1].toLowerCase()];
+      headingYear = Number(heading[2]) || headingYear;
+      continue;
+    }
+    if (headingMonth === null) continue;
+    const entry = line.match(/^(\d{1,2})(?:\s*[–—-]\s*(\d{1,2}))?\s*[–—-]\s*(.+)$/);
+    if (!entry) continue;
+    const startDay = Number(entry[1]);
+    const endDay = entry[2] ? Number(entry[2]) : null;
+    const location = entry[3].replace(/🇵🇭|🇬🇧|🇸🇬|✅|\([^)]*updated[^)]*\)/gi, "").trim();
+    const countryCode = /🇬🇧|\bUK\b|United Kingdom/i.test(line) ? "GB" : /🇸🇬|Singapore/i.test(line) ? "SG" : "PH";
+    const timezone = countryCode === "GB" ? "Europe/London" : countryCode === "SG" ? "Asia/Singapore" : "Asia/Manila";
+    const start = `${headingYear}-${String(headingMonth + 1).padStart(2, "0")}-${String(startDay).padStart(2, "0")}T09:00`;
+    const end = endDay ? `${headingYear}-${String(headingMonth + 1).padStart(2, "0")}-${String(endDay).padStart(2, "0")}T17:00` : null;
+    headingRecords.push({ event_at: start, ends_at: end, venue: location === "UK" ? "United Kingdom" : location, city: location === "UK" ? "United Kingdom" : location, capacity: 0, status: "scheduled", timezone, country_code: countryCode });
+  }
+  if (headingRecords.length) return headingRecords;
+
   const monthPattern = /(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*,?\s*)?(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?/gi;
   const matches = [...cleaned.matchAll(monthPattern)];
   if (!matches.length) return [];
@@ -353,12 +483,16 @@ function parseScheduleSource(source: string): ExtractedSchedule[] {
     const venue = explicitVenue || residual[0] || "Venue to be confirmed";
     const city = philippineCities.find((place) => `${segment} ${venue}`.toLowerCase().includes(place.toLowerCase())) || "";
     const capacity = Number(segment.match(/\b(\d+)\s*(?:seats?|pax|participants?)\b/i)?.[1] ?? 0);
+    const countryCode = /🇬🇧|\bUK\b|United Kingdom/i.test(segment) ? "GB" : /🇸🇬|Singapore/i.test(segment) ? "SG" : "PH";
     return {
       event_at: toLocalDateTimeValue(new Date(year, month, day, hour, minute)),
+      ends_at: null,
       venue,
       city,
       capacity,
       status: "scheduled",
+      timezone: countryCode === "GB" ? "Europe/London" : countryCode === "SG" ? "Asia/Singapore" : "Asia/Manila",
+      country_code: countryCode,
     };
   });
 }
@@ -410,7 +544,7 @@ function ScheduleExtractor({ onClose, onImport }: { onClose: () => void; onImpor
           <button className="platform-primary" type="button" disabled={!source.trim() || readingImage} onClick={() => extract()}>Extract schedules</button>
         </div>
         {error && <div className="platform-inline-error" role="alert">{error}</div>}
-        {records.length > 0 && <div className="schedule-extractor-results"><header><div><span className="admin-eyebrow">Ready to review</span><h3>{records.length} schedule{records.length === 1 ? "" : "s"} found</h3></div><span>Edit anything before publishing</span></header>{records.map((record, index) => <article key={`${record.event_at}-${index}`}><span className="schedule-result-number">{String(index + 1).padStart(2, "0")}</span><label>Date and time<input type="datetime-local" value={record.event_at} onChange={(event) => updateRecord(index, { event_at: event.target.value })} /></label><label>Venue<input value={record.venue} onChange={(event) => updateRecord(index, { venue: event.target.value })} /></label><label>City<input value={record.city} onChange={(event) => updateRecord(index, { city: event.target.value })} /></label><label>Seats<input type="number" min="0" value={record.capacity || ""} onChange={(event) => updateRecord(index, { capacity: Number(event.target.value) || 0 })} /></label><button type="button" aria-label={`Remove schedule ${index + 1}`} onClick={() => setRecords((current) => current.filter((_, recordIndex) => recordIndex !== index))}>×</button></article>)}</div>}
+        {records.length > 0 && <div className="schedule-extractor-results"><header><div><span className="admin-eyebrow">Ready to review</span><h3>{records.length} schedule{records.length === 1 ? "" : "s"} found</h3></div><span>Edit anything before publishing</span></header>{records.map((record, index) => <article key={`${record.event_at}-${index}`}><span className="schedule-result-number">{String(index + 1).padStart(2, "0")}</span><label>Starts<input type="datetime-local" value={record.event_at} onChange={(event) => updateRecord(index, { event_at: event.target.value })} /></label><label>Ends<input type="datetime-local" value={record.ends_at ?? ""} onChange={(event) => updateRecord(index, { ends_at: event.target.value || null })} /></label><label>Venue<input value={record.venue} onChange={(event) => updateRecord(index, { venue: event.target.value, city: event.target.value })} /></label><label>Country<select value={record.country_code} onChange={(event) => { const country_code = event.target.value; updateRecord(index, { country_code, timezone: country_code === "GB" ? "Europe/London" : country_code === "SG" ? "Asia/Singapore" : "Asia/Manila" }); }}><option value="PH">🇵🇭 PH</option><option value="GB">🇬🇧 UK</option><option value="SG">🇸🇬 SG</option></select></label><button type="button" aria-label={`Remove schedule ${index + 1}`} onClick={() => setRecords((current) => current.filter((_, recordIndex) => recordIndex !== index))}>×</button></article>)}</div>}
         <footer><button type="button" onClick={onClose}>Cancel</button><button className="platform-primary" type="button" disabled={!records.length || saving} onClick={() => { setSaving(true); setError(""); void onImport(records).catch(() => setError("One or more schedules could not be published. Check for duplicate dates and venues.")).finally(() => setSaving(false)); }}>{saving ? "Publishing…" : `Publish ${records.length || ""} schedule${records.length === 1 ? "" : "s"}`}</button></footer>
       </section>
     </div>
@@ -644,7 +778,7 @@ function ScheduleManagement() {
   const [editing, setEditing] = useState<StoredRecord | null | undefined>(undefined);
   const [extractorOpen, setExtractorOpen] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const seededSchedules = schedules.map(([event_at, venue, status]) => ({ event_at, venue, status }));
+  const seededSchedules: StoredRecord[] = schedules.map((item) => ({ ...item }));
   const { records: items, connection, createRecord, updateRecord } = usePlatformRecords("schedules", seededSchedules);
   const visible = items.filter((item) => `${item.event_at ?? ""} ${item.venue ?? ""} ${item.city ?? ""}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => new Date(String(a.event_at)).getTime() - new Date(String(b.event_at)).getTime());
   return (
@@ -657,22 +791,22 @@ function ScheduleManagement() {
           {saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}
           <div className="admin-schedule-list">{visible.map((item, index) => {
             const published = item.status === "scheduled";
-            return <article key={String(item.id ?? `${item.event_at}-${index}`)}><time><b>{item.event_at ? new Intl.DateTimeFormat("en-PH", { day: "2-digit", timeZone: "Asia/Manila" }).format(new Date(item.event_at)) : "—"}</b><span>{item.event_at ? new Intl.DateTimeFormat("en-PH", { month: "short", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(item.event_at)) : "Date pending"}</span></time><div><span className={`admin-status ${published ? "paid" : "pending"}`}><i />{published ? "Published" : String(item.status ?? "Draft")}</span><h3>{String(item.city || "Awakening session")}</h3><p>{String(item.venue ?? "Venue pending")}</p><small>{item.event_at ? new Intl.DateTimeFormat("en-PH", { weekday: "long", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(item.event_at)) : ""}{item.capacity ? ` · ${item.capacity} seats` : ""}</small></div><div><button type="button" onClick={() => setEditing(item)}>Edit</button><button type="button" disabled={!item.id} onClick={() => void updateRecord(item.id, { status: published ? "draft" : "scheduled" }).then(() => setSaveError("")).catch(() => setSaveError("The publishing status could not be changed."))}>{published ? "Unpublish" : "Publish"}</button></div></article>;
+            return <article key={String(item.id ?? `${item.event_at}-${index}`)}><time><b>{formatRecordPart(item, { day: "2-digit" }) || "—"}</b><span>{formatRecordPart(item, { month: "short", year: "numeric" }) || "Date pending"}</span></time><div><span className={`admin-status ${published ? "paid" : "pending"}`}><i />{published ? "Published" : String(item.status ?? "Draft")}</span><h3>{scheduleFlag(item.country_code)} {String(item.city || "Awakening session")}</h3><p>{String(item.venue ?? "Venue pending")}</p><small>{item.event_at ? formatScheduleRange(asPublicSchedule(item)) : ""}{item.capacity ? ` · ${item.capacity} seats` : ""}</small></div><div><button type="button" onClick={() => setEditing(item)}>Edit</button><button type="button" disabled={!item.id} onClick={() => void updateRecord(item.id, { status: published ? "draft" : "scheduled" }).then(() => setSaveError("")).catch(() => setSaveError("The publishing status could not be changed."))}>{published ? "Unpublish" : "Publish"}</button></div></article>;
           })}</div>
         </section>
       </section>
       {editing !== undefined && <ScheduleModal record={editing ?? undefined} onClose={() => setEditing(undefined)} onSave={async (payload) => { if (editing?.id) await updateRecord(editing.id, payload); else await createRecord(payload); setEditing(undefined); setSaveError(""); }} />}
-      {extractorOpen && <ScheduleExtractor onClose={() => setExtractorOpen(false)} onImport={async (extracted) => { for (const item of extracted) await createRecord({ ...item, event_at: new Date(item.event_at).toISOString() }); setExtractorOpen(false); setSaveError(""); }} />}
+      {extractorOpen && <ScheduleExtractor onClose={() => setExtractorOpen(false)} onImport={async (extracted) => { for (const item of extracted) await createRecord({ ...item, event_at: zonedDateTimeToIso(item.event_at, item.timezone) ?? undefined, ends_at: item.ends_at ? zonedDateTimeToIso(item.ends_at, item.timezone) : null }); setExtractorOpen(false); setSaveError(""); }} />}
       <button className="platform-floating-add" type="button" onClick={() => setEditing(null)} aria-label="New Schedule">＋</button>
     </PlatformShell>
   );
 }
 
 function PlatformSchedules() {
-  const seededSchedules = schedules.map(([event_at, venue, status]) => ({ event_at, venue, status }));
+  const seededSchedules: StoredRecord[] = schedules.map((item) => ({ ...item }));
   const { records, connection } = usePlatformRecords("schedules", seededSchedules);
   const published = records.filter((item) => item.status === "scheduled").sort((a, b) => new Date(String(a.event_at)).getTime() - new Date(String(b.event_at)).getTime());
-  return <PlatformShell page="latest-schedules"><section className="ops-data-page"><header className="ops-data-hero"><div><span className="admin-eyebrow">Public schedule preview</span><h1>Latest Schedules</h1><p>This is the same live schedule shown to visitors and inside Secure My Slot.</p></div><DataConnectionBadge state={connection} /></header><div className="ops-schedule-grid">{published.map((item, index) => <article key={String(item.id ?? index)}><time><b>{item.event_at ? new Intl.DateTimeFormat("en-PH", { day: "2-digit", timeZone: "Asia/Manila" }).format(new Date(item.event_at)) : "—"}</b><span>{item.event_at ? new Intl.DateTimeFormat("en-PH", { month: "short", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(item.event_at)) : "Pending"}</span></time><div><span>{String(item.city ?? "Awakening Philippines")}</span><h2>{String(item.venue ?? "Venue pending")}</h2><p>{item.event_at ? new Intl.DateTimeFormat("en-PH", { weekday: "long", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(item.event_at)) : "Time pending"}</p></div><Link href="/platform/seminar-schedule-management">Edit ↗</Link></article>)}</div></section></PlatformShell>;
+  return <PlatformShell page="latest-schedules"><section className="ops-data-page"><header className="ops-data-hero"><div><span className="admin-eyebrow">Public schedule preview</span><h1>Latest Schedules</h1><p>This is the same live schedule shown to visitors and inside Secure My Slot.</p></div><DataConnectionBadge state={connection} /></header><div className="ops-schedule-grid">{published.map((item, index) => <article key={String(item.id ?? index)}><time><b>{formatRecordPart(item, { day: "2-digit" }) || "—"}</b><span>{formatRecordPart(item, { month: "short", year: "numeric" }) || "Pending"}</span></time><div><span>{scheduleFlag(item.country_code)} {String(item.city ?? "Awakening Philippines")}</span><h2>{String(item.venue ?? "Venue pending")}</h2><p>{item.event_at ? formatScheduleRange(asPublicSchedule(item)) : "Time pending"}</p></div><Link href="/platform/seminar-schedule-management">Edit ↗</Link></article>)}</div></section></PlatformShell>;
 }
 
 function ApplicationModal({ page, onClose, onSave }: { page: "applications-organizations" | "applications-staffing" | "applications-sponsorship"; onClose: () => void; onSave: (payload: StoredRecord) => Promise<void> }) {

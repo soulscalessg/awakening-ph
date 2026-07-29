@@ -12,6 +12,11 @@ import {
   SidebarToggleIcon,
   TicketIcon,
 } from "./AwakeningIcons";
+import {
+  formatScheduleRange,
+  scheduleOptionLabel,
+  type PublicSchedule,
+} from "../schedule-format";
 
 type Page =
   | "home"
@@ -21,45 +26,29 @@ type Page =
   | "organizations"
   | "community";
 
-type PublicSchedule = {
-  id: string;
-  event_at: string;
-  venue: string;
-  city?: string | null;
-  capacity?: number | null;
-  status: string;
-};
-
 const fallbackSchedules: PublicSchedule[] = [
-  { id: "aug-15-manila", event_at: "2026-08-15T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
-  { id: "aug-22-olongapo", event_at: "2026-08-22T09:00:00+08:00", venue: "Olongapo", city: "Olongapo", status: "scheduled" },
-  { id: "sep-05-pampanga", event_at: "2026-09-05T09:00:00+08:00", venue: "Pampanga", city: "Pampanga", status: "scheduled" },
-  { id: "sep-12-rizal", event_at: "2026-09-12T09:00:00+08:00", venue: "Rizal", city: "Rizal", status: "scheduled" },
-  { id: "sep-19-manila", event_at: "2026-09-19T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
-  { id: "oct-10-manila", event_at: "2026-10-10T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
-  { id: "oct-17-laguna", event_at: "2026-10-17T09:00:00+08:00", venue: "Laguna", city: "Laguna", status: "scheduled" },
-  { id: "nov-07-marikina", event_at: "2026-11-07T09:00:00+08:00", venue: "Marikina", city: "Marikina", status: "scheduled" },
-  { id: "nov-21-manila", event_at: "2026-11-21T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
-  { id: "nov-28-quezon", event_at: "2026-11-28T09:00:00+08:00", venue: "Quezon", city: "Quezon", status: "scheduled" },
-  { id: "dec-05-manila", event_at: "2026-12-05T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
+  { id: "aug-15-manila", event_at: "2026-08-15T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "aug-22-manila", event_at: "2026-08-22T09:00:00+08:00", venue: "Manila", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "aug-22-olongapo", event_at: "2026-08-22T09:00:00+08:00", venue: "Olongapo", city: "Olongapo", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "sep-05-pampanga", event_at: "2026-09-05T09:00:00+08:00", venue: "Pampanga", city: "Pampanga", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "sep-06-la-union", event_at: "2026-09-06T09:00:00+08:00", venue: "La Union", city: "La Union", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "sep-12-rizal", event_at: "2026-09-12T09:00:00+08:00", venue: "Rizal", city: "Rizal", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "sep-19-manila", event_at: "2026-09-19T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "sep-20-manila", event_at: "2026-09-20T09:00:00+08:00", venue: "Manila", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "sep-26-pampanga", event_at: "2026-09-26T09:00:00+08:00", venue: "Pampanga", city: "Pampanga", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "oct-03-tarlac", event_at: "2026-10-03T09:00:00+08:00", venue: "Tarlac", city: "Tarlac", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "oct-03-manila", event_at: "2026-10-03T09:00:00+08:00", venue: "Manila", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "oct-10-manila", event_at: "2026-10-10T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "oct-11-uk", event_at: "2026-10-11T09:00:00+01:00", venue: "United Kingdom", city: "United Kingdom", status: "scheduled", timezone: "Europe/London", country_code: "GB" },
+  { id: "oct-17-laguna", event_at: "2026-10-17T09:00:00+08:00", venue: "Laguna", city: "Laguna", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "oct-26-koronadal", event_at: "2026-10-26T09:00:00+08:00", ends_at: "2026-10-31T17:00:00+08:00", venue: "Koronadal", city: "Koronadal", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "nov-01-tagaytay", event_at: "2026-11-01T09:00:00+08:00", venue: "Tagaytay", city: "Tagaytay", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "nov-07-marikina", event_at: "2026-11-07T09:00:00+08:00", venue: "Marikina", city: "Marikina", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "nov-20-singapore", event_at: "2026-11-20T09:00:00+08:00", ends_at: "2026-11-23T17:00:00+08:00", venue: "Singapore", city: "Singapore", status: "scheduled", timezone: "Asia/Singapore", country_code: "SG" },
+  { id: "nov-21-manila", event_at: "2026-11-21T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "nov-28-quezon", event_at: "2026-11-28T09:00:00+08:00", venue: "Quezon", city: "Quezon", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
+  { id: "dec-05-manila", event_at: "2026-12-05T09:00:00+08:00", venue: "Manila", city: "Manila", status: "scheduled", timezone: "Asia/Manila", country_code: "PH" },
 ];
-
-function formatScheduleDate(eventAt: string, includeWeekday = true) {
-  return new Intl.DateTimeFormat("en-PH", {
-    ...(includeWeekday ? { weekday: "long" as const } : {}),
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "Asia/Manila",
-  }).format(new Date(eventAt));
-}
-
-function scheduleOptionLabel(schedule: PublicSchedule) {
-  const place = schedule.city || schedule.venue;
-  return `${formatScheduleDate(schedule.event_at, false)} · ${place}`;
-}
 
 function usePublicSchedules() {
   const [schedules, setSchedules] = useState<PublicSchedule[]>(fallbackSchedules);
@@ -67,17 +56,27 @@ function usePublicSchedules() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/public-schedules", { cache: "no-store" })
+    const loadSchedules = () => fetch("/api/public-schedules", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Schedules unavailable");
         const result = (await response.json()) as { data?: PublicSchedule[] };
-        if (active && result.data?.length) {
-          setSchedules(result.data);
+        if (active) {
+          setSchedules(result.data ?? []);
           setLive(true);
         }
       })
       .catch(() => undefined);
-    return () => { active = false; };
+    void loadSchedules();
+    const timer = window.setInterval(() => void loadSchedules(), 15_000);
+    const refreshVisible = () => {
+      if (document.visibilityState === "visible") void loadSchedules();
+    };
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
   }, []);
 
   return { schedules, live };
@@ -433,7 +432,7 @@ function HomePage() {
             <div><strong>{countdown.minutes}</strong><span>MINUTES</span></div>
             <div><strong>{countdown.seconds}</strong><span>SECONDS</span></div>
           </div>
-          <p>{formatScheduleDate(nextSchedule.event_at, false)} · {nextSchedule.venue}</p>
+          <p>{formatScheduleRange(nextSchedule, false)} · {nextSchedule.venue}</p>
           <Link className="home-text-link" href="/registration">Reserve this date <span>↗</span></Link>
         </div>
       </section>
@@ -586,7 +585,7 @@ function SchedulesPage() {
                     </div>
                     <div>
                       <span>Date &amp; Time</span>
-                      <strong>{formatScheduleDate(schedule.event_at)}</strong>
+                      <strong>{formatScheduleRange(schedule)}</strong>
                     </div>
                   </div>
                   <div className="schedule-detail">
@@ -638,7 +637,7 @@ function RegistrationProgress({ step }: { step: number }) {
 function RegistrationPage() {
   const { schedules: publicSchedules } = usePublicSchedules();
   const [step, setStep] = useState(1);
-  const [schedule, setSchedule] = useState("");
+  const [scheduleId, setScheduleId] = useState("");
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [name, setName] = useState("");
@@ -652,6 +651,12 @@ function RegistrationPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const total = useMemo(() => 1499 * quantity, [quantity]);
+  const selectedSchedule = publicSchedules.find((item) => item.id === scheduleId);
+  const schedule = selectedSchedule ? scheduleOptionLabel(selectedSchedule) : "";
+
+  useEffect(() => {
+    if (scheduleId && !selectedSchedule) setScheduleId("");
+  }, [scheduleId, selectedSchedule]);
 
   function advanceTo(nextStep: number) {
     setError("");
@@ -661,7 +666,7 @@ function RegistrationPage() {
 
   function buyAnotherTicket() {
     setStep(1);
-    setSchedule("");
+    setScheduleId("");
     setScheduleOpen(false);
     setQuantity(1);
     setName("");
@@ -701,6 +706,7 @@ function RegistrationPage() {
           email,
           phone,
           event_date: schedule,
+          schedule_id: scheduleId,
           quantity,
           total_amount: total,
           payment_method: method,
@@ -792,7 +798,7 @@ function RegistrationPage() {
                       aria-controls="registration-date-options"
                       onClick={() => setScheduleOpen((open) => !open)}
                     >
-                      <span>{schedule ? `🇵🇭 ${schedule} — PHP 1,499` : "Select your preferred date"}</span>
+                      <span>{schedule ? `${schedule} — PHP 1,499` : "Select your preferred date"}</span>
                       <span className="source-chevron" aria-hidden="true">⌄</span>
                     </button>
                     {scheduleOpen && (
@@ -803,16 +809,16 @@ function RegistrationPage() {
                           <button
                             type="button"
                             role="option"
-                            aria-selected={schedule === option}
-                            className={schedule === option ? "is-selected" : ""}
-                            key={option}
+                            aria-selected={scheduleId === item.id}
+                            className={scheduleId === item.id ? "is-selected" : ""}
+                            key={item.id}
                             onClick={() => {
-                              setSchedule(option);
+                              setScheduleId(item.id);
                               setScheduleOpen(false);
                             }}
                           >
-                            🇵🇭 {option} — PHP 1,499
-                            {schedule === option && <span aria-hidden="true">✓</span>}
+                            {option} — PHP 1,499
+                            {scheduleId === item.id && <span aria-hidden="true">✓</span>}
                           </button>
                           );
                         })}

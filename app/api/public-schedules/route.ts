@@ -1,15 +1,7 @@
 import { isSupabaseConfigured, supabaseRequest } from "../../supabase-server";
+import type { PublicSchedule } from "../../schedule-format";
 
 export const dynamic = "force-dynamic";
-
-type ScheduleRecord = {
-  id: string;
-  event_at: string;
-  venue: string;
-  city?: string | null;
-  capacity?: number | null;
-  status: string;
-};
 
 export async function GET() {
   if (!isSupabaseConfigured()) {
@@ -17,8 +9,8 @@ export async function GET() {
   }
 
   try {
-    const records = await supabaseRequest<ScheduleRecord[]>(
-      "awakening_schedules?select=id,event_at,venue,city,capacity,status&status=eq.scheduled&order=event_at.asc",
+    const records = await supabaseRequest<PublicSchedule[]>(
+      "awakening_schedules?select=id,event_at,ends_at,venue,city,capacity,status,timezone,country_code&status=eq.scheduled&order=event_at.asc",
     );
     const now = Date.now();
     const upcoming = records.filter((record) => new Date(record.event_at).getTime() >= now);
