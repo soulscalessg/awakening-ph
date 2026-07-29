@@ -681,23 +681,37 @@ function RegistrationPage() {
 }
 
 function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [step, setStep] = useState<"email" | "password">("email");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setSubmitting(true);
 
-    if (step === "email") {
-      if (!email.trim()) return;
-      setStep("password");
-      return;
+    try {
+      const response = await fetch("/api/platform-login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setError(result.error ?? "Unable to log in.");
+        return;
+      }
+
+      const requestedPath = new URLSearchParams(window.location.search).get("next");
+      window.location.href = requestedPath?.startsWith("/platform")
+        ? requestedPath
+        : "/platform";
+    } catch {
+      setError("Unable to log in. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    if (!password) return;
-    window.location.href = "/platform";
   }
 
   return (
@@ -706,48 +720,37 @@ function LoginPage() {
         <form className="login-card" onSubmit={submit}>
           <span className="source-login-logo-space" aria-hidden="true" />
 
-          {step === "email" ? (
-            <>
-              <header className="source-login-heading">
-                <h1>Welcome back</h1>
-                <p>Log in to continue</p>
-              </header>
-              <label>
-                <span>Email*</span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="Enter your email"
-                  autoComplete="email"
-                  required
-                />
-              </label>
-            </>
-          ) : (
-            <>
-              <header className="source-login-heading">
-                <h1>Enter your password</h1>
-              </header>
-              <label>
-                <span>Password</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  autoFocus
-                  required
-                />
-              </label>
-            </>
-          )}
+          <header className="source-login-heading">
+            <h1>Operations Platform</h1>
+            <p>Authorized access only</p>
+          </header>
+          <label>
+            <span>Username</span>
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="Enter your username"
+              autoComplete="username"
+              autoFocus
+              required
+            />
+          </label>
+          <label>
+            <span>Password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Enter your password"
+              autoComplete="current-password"
+              required
+            />
+          </label>
 
           {error && <p className="source-login-error" role="alert">{error}</p>}
 
-          <button className="source-login-submit" type="submit">
-            Continue
+          <button className="source-login-submit" type="submit" disabled={submitting}>
+            {submitting ? "Signing in…" : "Sign in"}
           </button>
         </form>
       </section>

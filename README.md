@@ -30,6 +30,11 @@ insights, CRM, registration management, seminar schedules, and application
 tracking. New records and filters are interactive in the browser; this version
 keeps those demonstration records in the current session.
 
+The public website and operations platform share one deployment. Public routes
+remain open, while every `/platform` route requires the server-validated admin
+login at `/login`. Authentication settings are supplied through the three
+`PLATFORM_*` environment variables listed in `.env.example`.
+
 ## Verification
 
 ```bash

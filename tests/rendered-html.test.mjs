@@ -53,8 +53,8 @@ test("server-renders every public product route", async () => {
   const routes = [
     ["/latest-schedules", /Awakening: An Emotional Reset Experience/],
     ["/registration", /Choose Your Experience/],
-    ["/login", /Welcome back/],
-    ["/awakening-for-organizations", /Welcome back/],
+    ["/login", /Operations Platform/],
+    ["/awakening-for-organizations", /Operations Platform/],
     ["/be-part-of-awakening", /There’s a place for you in this movement/],
   ];
 
@@ -76,17 +76,19 @@ test("registration starts with an accessible ticket-selection step", async () =>
   assert.match(html, /Continue to Details/);
 });
 
-test("server-renders the recreated operations platform", async () => {
-  const platform = await renderedHtml("/platform");
-  assert.match(platform, /System Information/);
-  assert.match(platform, /Hybrid/);
-  assert.match(platform, /Sales &amp; Administration/);
+test("protects the operations platform behind the admin login", async () => {
+  for (const pathname of [
+    "/platform",
+    "/platform/registration-center",
+    "/platform/applications/organizations",
+  ]) {
+    const response = await render(pathname);
+    assert.ok([302, 303, 307, 308].includes(response.status));
+    assert.match(response.headers.get("location") ?? "", /\/login\?next=\/platform$/);
+  }
 
-  const registrations = await renderedHtml("/platform/registration-center");
-  assert.match(registrations, /REGISTRATION CENTER/);
-  assert.match(registrations, /Total Tickets Sold/);
-  assert.match(registrations, /REGISTRATION MANAGER/);
-
-  const applications = await renderedHtml("/platform/applications/organizations");
-  assert.match(applications, /Awakening for Organizations Applications/);
+  const login = await renderedHtml("/login");
+  assert.match(login, /Operations Platform/);
+  assert.match(login, /Authorized access only/);
+  assert.match(login, /Enter your username/);
 });

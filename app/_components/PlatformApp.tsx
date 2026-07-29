@@ -50,7 +50,16 @@ function PlatformShell({ page, children }: { page: PlatformPage; children: React
       <header className="platform-topbar">
         <button className="platform-menu-button" type="button" aria-label="Toggle navigation" onClick={() => setMobileNav((open) => !open)}>☰</button>
         <Link href="/platform" className="platform-brand" aria-label="Awakening platform home"><img src="/awakening/logo-strip.png" alt="Awakening" /></Link>
-        <button className="platform-avatar" type="button" aria-label="Open account menu">SS</button>
+        <button
+          className="platform-avatar"
+          type="button"
+          aria-label="Log out"
+          title="Log out"
+          onClick={async () => {
+            await fetch("/api/platform-logout", { method: "POST" });
+            window.location.href = "/";
+          }}
+        >SS</button>
       </header>
       <aside className={`platform-sidebar ${mobileNav ? "is-open" : ""}`}>
         <nav aria-label="Platform navigation">
