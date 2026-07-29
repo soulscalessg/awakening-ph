@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const SITE_URL = "https://awakening-ph-official.soulscaleacademy.workers.dev";
+const SITE_URL = "https://awakening-ph-official.soulscalegroup.workers.dev";
 const SITE_NAME = "Awakening PH";
 const SITE_DESCRIPTION =
   "Awakening PH is a guided emotional reset experience for individuals, teams, and communities across the Philippines.";

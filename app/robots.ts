@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: ["/api/", "/login", "/platform/"],
     },
-    sitemap: "https://awakening-ph-official.soulscaleacademy.workers.dev/sitemap.xml",
-    host: "https://awakening-ph-official.soulscaleacademy.workers.dev",
+    sitemap: "https://awakening-ph-official.soulscalegroup.workers.dev/sitemap.xml",
+    host: "https://awakening-ph-official.soulscalegroup.workers.dev",
   };
 }
