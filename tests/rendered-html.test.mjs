@@ -48,7 +48,7 @@ test("server-renders the finished Awakening home page and metadata", async () =>
   assert.match(html, /\/og-awakening\.png/);
   assert.match(
     html,
-    /rel="canonical" href="https:\/\/awakening-ph-platform\.soulsync\.workers\.dev\/"/i,
+    /rel="canonical" href="https:\/\/awakening-ph-official\.soulscaleacademy\.workers\.dev\/"/i,
   );
   assert.match(html, /application\/ld\+json/i);
   assert.match(html, /Awakening Philippines/);
@@ -69,7 +69,7 @@ test("publishes crawl directives and a public-only sitemap", async () => {
   assert.match(robots, /Disallow: \/platform\//);
   assert.match(
     robots,
-    /Sitemap: https:\/\/awakening-ph-platform\.soulsync\.workers\.dev\/sitemap\.xml/,
+    /Sitemap: https:\/\/awakening-ph-official\.soulscaleacademy\.workers\.dev\/sitemap\.xml/,
   );
 
   const sitemapResponse = await render("/sitemap.xml", {
@@ -79,11 +79,11 @@ test("publishes crawl directives and a public-only sitemap", async () => {
   const sitemap = await sitemapResponse.text();
   assert.match(
     sitemap,
-    /https:\/\/awakening-ph-platform\.soulsync\.workers\.dev\/latest-schedules/,
+    /https:\/\/awakening-ph-official\.soulscaleacademy\.workers\.dev\/latest-schedules/,
   );
   assert.match(
     sitemap,
-    /https:\/\/awakening-ph-platform\.soulsync\.workers\.dev\/registration/,
+    /https:\/\/awakening-ph-official\.soulscaleacademy\.workers\.dev\/registration/,
   );
   assert.doesNotMatch(sitemap, /\/platform/);
   assert.doesNotMatch(sitemap, /\/login/);
@@ -102,7 +102,7 @@ test("uses unique metadata for each public conversion route", async () => {
     assert.match(html, title);
     assert.match(
       html,
-      new RegExp(`https://awakening-ph-platform\\.soulsync\\.workers\\.dev${pathname}`),
+      new RegExp(`https://awakening-ph-official\\.soulscaleacademy\\.workers\\.dev${pathname}`),
     );
   }
 });

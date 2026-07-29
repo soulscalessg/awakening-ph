@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "awakening-ph-platform",
+  "name": "awakening-ph-official",
   "main": "dist/server/index.js",
   "workers_dev": true,
   "routes": [
