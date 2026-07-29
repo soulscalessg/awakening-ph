@@ -1,0 +1,803 @@
+"use client";
+
+import Link from "next/link";
+import { FormEvent, Fragment, ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  BuildingIcon,
+  CalendarIcon,
+  FacebookIcon,
+  InstagramIcon,
+  LinkedInIcon,
+  LoginIcon,
+  MapPinIcon,
+  ScheduleCalendarIcon,
+  SidebarToggleIcon,
+  TicketIcon,
+} from "./AwakeningIcons";
+
+type Page =
+  | "home"
+  | "schedules"
+  | "registration"
+  | "login"
+  | "organizations"
+  | "community";
+
+const registrationOptions = [
+  "July 26 - Manila",
+  "July 25 - Cebu",
+  "August 8 - Baguio",
+  "August 15 - Manila",
+  "August 22 - Olongapo",
+  "September 5 - Pampanga",
+  "September 12 - Rizal",
+  "September 19 - Manila",
+  "October 10 - Manila",
+  "October 17 - Laguna",
+  "November 7 - Marikina",
+  "November 21 - Manila",
+  "November 28 - Quezon",
+  "December 5 - Manila",
+] as const;
+
+const latestSchedules = [
+  { date: "Saturday, May 30, 2026 at 9:00 AM", venue: "Davao" },
+  { date: "Sunday, May 31, 2026 at 9:00 AM", venue: "General Santos" },
+  {
+    date: "Saturday, June 20, 2026 at 9:00 AM",
+    venue: "House of Transformation, Ayala the 30th, Pasig",
+  },
+  { date: "Monday, July 27, 2026 at 9:00 AM", venue: "Cebu" },
+  {
+    date: "Saturday, July 18, 2026 at 9:00 AM",
+    venue: "House of Transformation, Ayala the 30th, Pasig",
+  },
+  {
+    date: "Monday, July 27, 2026 at 9:00 AM",
+    venue: "House of Transformation, Ayala the 30th, Pasig",
+  },
+  {
+    date: "Saturday, August 15, 2026 at 9:00 AM",
+    venue: "House of Transformation, Ayala the 30th, Pasig",
+  },
+  {
+    date: "Saturday, September 19, 2026 at 9:00 AM",
+    venue: "House of Transformation, Ayala the 30th, Pasig",
+  },
+  {
+    date: "Saturday, October 10, 2026 at 9:00 AM",
+    venue: "House of Transformation, Ayala the 30th, Pasig",
+  },
+  {
+    date: "Saturday, November 21, 2026 at 9:00 AM",
+    venue: "House of Transformation, Ayala the 30th, Pasig",
+  },
+] as const;
+
+function Shell({
+  active,
+  children,
+  initialLoading = false,
+}: {
+  active?: Page;
+  children: ReactNode;
+  initialLoading?: boolean;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  return (
+    <div className={`site-shell ${initialLoading ? "is-initial-loading" : ""}`}>
+      <header className="topbar">
+        <button
+          className="mobile-menu"
+          type="button"
+          aria-label="Toggle sidebar"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span className="sr-only">Toggle sidebar</span>
+          <SidebarToggleIcon />
+        </button>
+        <Link className="brand" href="/" aria-label="Awakening home">
+          <img src="/awakening/logo-strip.png" alt="Awakening" />
+        </Link>
+        <Link className="login-pill" href="/login">
+          <span className="login-icon"><LoginIcon /></span>
+          <span>Log In</span>
+        </Link>
+      </header>
+
+      <aside className={`sidebar ${menuOpen ? "is-open" : ""}`}>
+        <nav aria-label="Main navigation">
+          <Link
+            className={active === "schedules" ? "active" : ""}
+            href="/latest-schedules"
+          >
+            <span className="nav-icon"><CalendarIcon /></span>
+            <span className="nav-label">Latest Schedules</span>
+          </Link>
+          <Link
+            className={active === "registration" ? "active" : ""}
+            href="/registration"
+          >
+            <span className="nav-icon"><TicketIcon /></span>
+            <span className="nav-label">Secure My Slot</span>
+          </Link>
+          <Link
+            className={active === "organizations" ? "active" : ""}
+            href="/awakening-for-organizations"
+          >
+            <span className="nav-icon"><BuildingIcon /></span>
+            <span className="nav-label">Awakening For Organizations</span>
+          </Link>
+        </nav>
+      </aside>
+
+      <main className="main-content">{children}</main>
+    </div>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="footer">
+      <div className="footer-inner">
+        <div className="footer-brand">
+          <img src="/awakening/logo-strip.png" alt="Awakening" />
+          <p>Philippines as a FIRST-WORLD country.</p>
+        </div>
+        <ul className="socials" aria-label="Social media">
+          <li><a href="https://www.facebook.com/people/Softr/" target="_blank" rel="noreferrer" aria-label="Facebook"><FacebookIcon /></a></li>
+          <li><a href="https://www.instagram.com/softr.io/" target="_blank" rel="noreferrer" aria-label="Instagram"><InstagramIcon /></a></li>
+          <li><a href="https://www.linkedin.com/company/softr/" target="_blank" rel="noreferrer" aria-label="LinkedIn"><LinkedInIcon /></a></li>
+        </ul>
+      </div>
+    </footer>
+  );
+}
+
+function HomePage() {
+  const carouselImages = [
+    "/awakening/carousel/facilitator.jpeg",
+    "/awakening/carousel/community.jpeg",
+    "/awakening/carousel/audience.jpeg",
+    "/awakening/carousel/group-hug.jpeg",
+    "/awakening/carousel/emotional-hug.jpeg",
+    "/awakening/carousel/full-community.jpeg",
+    "/awakening/carousel/flag.jpeg",
+  ];
+  const partnerImages = [
+    ["/awakening/partners/play-club.jpeg", "Pink Play Club"],
+    ["/awakening/partners/empowerment.png", "Empowerment"],
+    ["/awakening/partners/soulpreneur.png", "Soulpreneur Oasis"],
+    ["/awakening/partners/aliliw.jpeg", "8 Aliliw Botanika"],
+    ["/awakening/partners/metrotech.png", "Metrotech Rental Solutions"],
+    ["/awakening/partners/iam-plus.png", "I Am Plus"],
+    ["/awakening/partners/cyndi-kate.png", "Cyndi Kate Society"],
+  ];
+  const communityVideos = [
+    "https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/aa34b595-f42c-449d-8309-491c4e0a4f99.mp4",
+    "https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/490d34cf-7d52-480d-9fa2-88c173352932.mp4",
+    "https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/c8266825-2cb7-4c56-b158-6bf0f0864f89.mp4",
+    "https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/0a34890f-a3c9-4069-9a09-c715cf1813c5.mp4",
+    "https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/c713ce2c-0759-4551-9bb1-882b2be72f85.qt",
+    "https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/1ed840a4-b86f-479c-8c78-76c54dc3996d.qt",
+    "https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/da058278-4dfc-4c36-bd5d-88d0c1dd4a1a.qt",
+    "https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/ec5d8d82-650f-48a6-90d5-58e58335e0aa.mp4",
+  ];
+  const [activeSlide, setActiveSlide] = useState(4);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setInterval(
+      () => setActiveSlide((slide) => (slide + 1) % carouselImages.length),
+      5000,
+    );
+    return () => window.clearInterval(timer);
+  }, [carouselImages.length]);
+
+  useEffect(() => {
+    const revealTimer = window.setTimeout(() => setInitialLoadComplete(true), 350);
+    return () => window.clearTimeout(revealTimer);
+  }, []);
+
+  const filmLoading = !initialLoadComplete;
+
+  return (
+    <Shell active="home" initialLoading={!initialLoadComplete}>
+      <section className="source-hero">
+        <video
+          className="source-hero-video"
+          src="https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/b2e46684-6e4b-46da-baa5-c3f9b4d44879.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          aria-hidden="true"
+        />
+        <div className="source-hero-shade" />
+        <div className="source-hero-inner">
+          <Link className="eyebrow-link" href="/latest-schedules">
+            <b>NEW</b> See our next schedules →
+          </Link>
+          <img
+            className="hero-logo"
+            src="/awakening/logo-hero.png"
+            alt="Awakening — The Emotional Reset Experience"
+          />
+          <p>
+            If you’ve been stuck, overthinking, or just surviving… this is where
+            you reset.
+          </p>
+          <div className="button-row">
+            <Link className="button primary" href="/registration">
+              Join The Next Session
+            </Link>
+            <Link className="button secondary" href="/be-part-of-awakening">
+              Be Part of the Program
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="source-film">
+        <video
+          src="https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/2273d90c-8e51-4248-8f81-f81c9f164e5c.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          aria-label="Time to feel, time to awaken"
+        />
+        {filmLoading && (
+          <div className="source-film-loader" role="progressbar" aria-label="Loading video">
+            <span className="source-loader-spinner" />
+          </div>
+        )}
+      </section>
+
+      <section className="source-partners">
+        <p>COMMUNITY PARTNERS</p>
+        <div className="source-partner-row" aria-label="Community partners">
+          <div className="source-partner-track">
+            {[...partnerImages, ...partnerImages].map(([src, alt], index) => (
+              <img src={src} alt={alt} key={`${src}-${index}`} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="source-countdown">
+        <div className="source-countdown-shade" />
+        <div className="source-countdown-content">
+          <h1>Next Schedule</h1>
+          <div className="source-countdown-grid" aria-label="Countdown">
+            <div><strong>00</strong><span>DAYS</span></div>
+            <div><strong>00</strong><span>HOURS</span></div>
+            <div><strong>00</strong><span>MINUTES</span></div>
+            <div><strong>00</strong><span>SECONDS</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="source-carousel" aria-label="Awakening experience gallery">
+        <div className="source-carousel-frame">
+          <img src={carouselImages[activeSlide]} alt="Awakening experience" />
+        </div>
+      </section>
+
+      <section className="source-programs">
+        <h2>Programs We Are Connected To</h2>
+        <div className="program-grid">
+          <article>
+            <img src="/awakening/program-1.png" alt="Discovery" />
+          </article>
+          <article>
+            <img src="/awakening/program-2.png" alt="Breakthrough" />
+          </article>
+          <article>
+            <img src="/awakening/program-3.png" alt="Soulpreneur Oasis" />
+          </article>
+        </div>
+      </section>
+
+      <section className="source-video-grid" aria-label="Awakening community videos">
+        {communityVideos.map((src) => (
+          <video src={src} autoPlay muted loop playsInline key={src} />
+        ))}
+      </section>
+
+      <section className="source-act-now">
+        <h2>You already know if you need this.</h2>
+        <p>The only question is: Are you going to act now?</p>
+        <Link href="/registration">
+          Secure My Slot
+        </Link>
+      </section>
+
+      <section className="source-tickets">
+        <h2>Get Tickets To Next Session</h2>
+        <div className="ticket-card">
+          <div className="price">
+            PHP 1,499 <small>/ ticket</small>
+          </div>
+          <ul>
+            <li>Full-day Awakening Emotional Reset Experience</li>
+            <li>Guided breakthrough and deep reflection sessions</li>
+            <li>Safe, facilitated environment for real conversations</li>
+            <li>Clarity and direction integration session</li>
+            <li>Exclusive participant kit (notebook + wristband)</li>
+          </ul>
+          <Link className="source-reserve-button" href="/registration">
+            Reserve My Slot Now
+          </Link>
+        </div>
+      </section>
+
+      <section className="source-organization">
+        <div className="source-organization-card">
+          <div className="source-organization-copy">
+          <h2>Bring Awakening To Your Organization</h2>
+          <p>Everything you need to bring your ideas to life.</p>
+          <div className="button-row">
+            <Link className="button primary" href="/awakening-for-organizations">
+              Bring This To My Team
+            </Link>
+            <a
+              className="button secondary"
+              href="https://www.messenger.com/t/1036694216194763"
+            >
+              Talk To Us
+            </a>
+          </div>
+          </div>
+          <img src="/awakening/cta-grid.svg" alt="" />
+        </div>
+      </section>
+
+      <section className="source-join">
+        <h2>How Do You Want To Be Part Of Awakening?</h2>
+        <p>
+          Whether you want to serve, partner, support, or bring this to your team
+          there’s a place for you here.
+        </p>
+        <Link href="/be-part-of-awakening">
+          Learn More
+        </Link>
+      </section>
+
+      <Footer />
+    </Shell>
+  );
+}
+
+function SchedulesPage() {
+  return (
+    <Shell active="schedules">
+      <section className="schedules-page">
+        <div className="schedule-glow violet" />
+        <div className="schedule-glow blue" />
+        <div className="schedules-content">
+          <header className="schedules-heading">
+            <h1>Awakening: An Emotional Reset Experience</h1>
+            <p>
+              Join us for a powerful reset that breaks old patterns and moves
+              you forward.
+            </p>
+          </header>
+          <div className="schedule-list">
+            {latestSchedules.map((schedule, index) => (
+              <article
+                className="schedule-card"
+                key={`${schedule.date}-${schedule.venue}-${index}`}
+                style={{ animationDelay: `${index * 150}ms` }}
+              >
+                <div className="schedule-card-wash" />
+                <div className="schedule-card-content">
+                  <div className="schedule-detail">
+                    <div className="schedule-icon calendar">
+                      <ScheduleCalendarIcon />
+                    </div>
+                    <div>
+                      <span>Date &amp; Time</span>
+                      <strong>{schedule.date}</strong>
+                    </div>
+                  </div>
+                  <div className="schedule-detail">
+                    <div className="schedule-icon map-pin">
+                      <MapPinIcon />
+                    </div>
+                    <div>
+                      <span>Venue</span>
+                      <strong>{schedule.venue}</strong>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+      <Footer />
+    </Shell>
+  );
+}
+
+function RegistrationProgress({ step }: { step: number }) {
+  const labels = ["Ticket", "Details", "Payment", "Confirm"];
+  return (
+    <ol className="source-progress" aria-label="Registration progress">
+      {labels.map((label, index) => {
+        const number = index + 1;
+        const complete = step > number;
+        const active = step === number;
+        return (
+        <Fragment key={label}>
+        {index > 0 && <span className={`source-progress-line ${step >= number ? "is-complete" : ""}`} aria-hidden="true" />}
+        <li
+          className={`${complete ? "is-complete" : ""} ${active ? "is-active" : ""}`}
+          aria-current={active ? "step" : undefined}
+        >
+          <span className="source-progress-marker">
+            {complete ? <span className="source-check">✓</span> : number}
+          </span>
+          <small>{label}</small>
+        </li>
+        </Fragment>
+      )})}
+    </ol>
+  );
+}
+
+function RegistrationPage() {
+  const [step, setStep] = useState(1);
+  const [schedule, setSchedule] = useState("");
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [method, setMethod] = useState<"gcash" | "bank" | "">("");
+  const [referenceNumber, setReferenceNumber] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const total = useMemo(() => 1499 * quantity, [quantity]);
+
+  function advanceTo(nextStep: number) {
+    setError("");
+    setScheduleOpen(false);
+    setStep(nextStep);
+  }
+
+  function confirmRegistration() {
+    if (!referenceNumber.trim() || !proofFile) {
+      setError("Please complete all payment fields");
+      return;
+    }
+    setError("");
+    setSubmitted(true);
+  }
+
+  return (
+    <Shell active="registration">
+      <main className="source-registration">
+        <section className="source-registration-hero">
+          <div className="source-registration-hero-glow" aria-hidden="true" />
+          <div className="source-registration-hero-content">
+            <span className="source-registration-kicker"><span aria-hidden="true">✣</span> Save Your Slot</span>
+            <h1>Awakening PH</h1>
+            <p> </p>
+          </div>
+        </section>
+
+        <div className="source-progress-wrap">
+          <RegistrationProgress step={submitted ? 5 : step} />
+        </div>
+
+        <section className="source-registration-content">
+          {!submitted && step === 1 && (
+            <article className="source-form-card source-ticket-card">
+              <div className="source-form-inner">
+                <header className="source-form-heading">
+                  <h2>Choose Your Experience</h2>
+                  <p>Select your preferred date and number of tickets</p>
+                </header>
+
+                <div className="source-field source-select-field">
+                  <label id="event-date-label">Event Date &amp; Location</label>
+                  <div className="source-select-wrap">
+                    <button
+                      type="button"
+                      className="source-select-trigger"
+                      role="combobox"
+                      aria-labelledby="event-date-label"
+                      aria-expanded={scheduleOpen}
+                      aria-controls="registration-date-options"
+                      onClick={() => setScheduleOpen((open) => !open)}
+                    >
+                      <span>{schedule ? `🇵🇭 ${schedule} — PHP 1,499` : "Select your preferred date"}</span>
+                      <span className="source-chevron" aria-hidden="true">⌄</span>
+                    </button>
+                    {scheduleOpen && (
+                      <div className="source-select-menu" id="registration-date-options" role="listbox">
+                        {registrationOptions.map((option) => (
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={schedule === option}
+                            className={schedule === option ? "is-selected" : ""}
+                            key={option}
+                            onClick={() => {
+                              setSchedule(option);
+                              setScheduleOpen(false);
+                            }}
+                          >
+                            🇵🇭 {option} — PHP 1,499
+                            {schedule === option && <span aria-hidden="true">✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="source-ticket-summary">
+                  <div className="source-ticket-top">
+                    <div className="source-ticket-price">
+                      <span>Price per ticket</span>
+                      <strong>PHP 1499.00</strong>
+                    </div>
+                    <div className="source-quantity-row">
+                      <button type="button" aria-label="Decrease quantity" onClick={() => setQuantity((value) => Math.max(1, value - 1))}>−</button>
+                      <div><span>Quantity</span><strong>{quantity}</strong></div>
+                      <button type="button" aria-label="Increase quantity" onClick={() => setQuantity((value) => value + 1)}>+</button>
+                    </div>
+                  </div>
+                  <div className="source-total-row">
+                    <span>Total Amount</span>
+                    <strong>PHP {total.toFixed(2)}</strong>
+                  </div>
+                </div>
+
+                <button type="button" className="source-primary-button source-full-button" disabled={!schedule || quantity < 1} onClick={() => advanceTo(2)}>
+                  Continue to Details
+                </button>
+              </div>
+            </article>
+          )}
+
+          {!submitted && step === 2 && (
+            <article className="source-form-card source-details-card">
+              <div className="source-form-inner">
+                <header className="source-form-heading">
+                  <h2>Your Information</h2>
+                  <p>We&apos;ll use this to send your confirmation</p>
+                </header>
+                <div className="source-input-stack">
+                  <label className="source-field">Full Name *<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Juan Dela Cruz" /></label>
+                  <label className="source-field">Email Address *<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="juan@example.com" /></label>
+                  <label className="source-field">Contact Number *<input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+63 912 345 6789" /></label>
+                </div>
+                <div className="source-form-actions">
+                  <button type="button" className="source-secondary-button" onClick={() => advanceTo(1)}>Back</button>
+                  <button type="button" className="source-primary-button" disabled={!name || !email || !phone} onClick={() => advanceTo(3)}>Continue to Payment</button>
+                </div>
+              </div>
+            </article>
+          )}
+
+          {!submitted && step === 3 && (
+            <article className="source-form-card source-payment-card">
+              <div className="source-form-inner">
+                <header className="source-form-heading">
+                  <h2>Choose Payment Method</h2>
+                  <p>Scan the QR code to complete your payment</p>
+                </header>
+                <div className="source-payment-grid">
+                  <button type="button" className={method === "gcash" ? "is-selected" : ""} onClick={() => setMethod("gcash")}>
+                    {method === "gcash" && <span className="source-payment-check" aria-hidden="true">✓</span>}
+                    <span className="source-qr-frame"><img src="/awakening/gcash-payment-qr.png" alt="GCash QR Code" /></span>
+                    <strong>GCash</strong><small>Scan to Pay</small>
+                  </button>
+                  <button type="button" className={method === "bank" ? "is-selected" : ""} onClick={() => setMethod("bank")}>
+                    {method === "bank" && <span className="source-payment-check" aria-hidden="true">✓</span>}
+                    <span className="source-qr-frame"><img src="/awakening/bank-transfer-qr.png" alt="Bank Transfer QR Code" /></span>
+                    <strong>Bank Transfer</strong><small>Enter Bank Details</small>
+                  </button>
+                </div>
+                <div className="source-form-actions">
+                  <button type="button" className="source-secondary-button" onClick={() => advanceTo(2)}>Back</button>
+                  <button type="button" className="source-primary-button" disabled={!method} onClick={() => advanceTo(4)}>I&apos;ve Paid</button>
+                </div>
+              </div>
+            </article>
+          )}
+
+          {!submitted && step === 4 && (
+            <div className="source-confirm-stack">
+              <article className="source-form-card source-scan-card">
+                <div className="source-form-inner">
+                  <header className="source-form-heading source-centered-heading"><h2>Haven&apos;t paid yet? Scan or Enter Details</h2></header>
+                  <div className="source-mini-qr-grid">
+                    <div><span className="source-mini-qr"><img src="/awakening/gcash-payment-qr.png" alt="GCash QR Code" /></span><strong>GCash</strong></div>
+                    <div><span className="source-mini-qr"><img src="/awakening/bank-transfer-qr.png" alt="Bank Transfer QR Code" /></span><strong>Bank Transfer</strong></div>
+                  </div>
+                  <p className="source-pay-total">Total to pay: <strong>PHP {total.toFixed(2)}</strong></p>
+                </div>
+              </article>
+
+              <article className="source-form-card source-summary-card">
+                <div className="source-form-inner">
+                  <header className="source-form-heading"><h2>Registration Summary</h2></header>
+                  <div className="source-summary-list">
+                    <div><span>Name</span><strong>{name}</strong></div>
+                    <div><span>Email</span><strong>{email}</strong></div>
+                    <div><span>Contact</span><strong>{phone}</strong></div>
+                    <div><span>Event Date</span><strong>{schedule}</strong></div>
+                    <div><span>Quantity</span><strong>{quantity} ticket(s)</strong></div>
+                    <div className="source-summary-total"><span>Total Amount</span><strong>PHP {total.toFixed(2)}</strong></div>
+                  </div>
+                </div>
+              </article>
+
+              <article className="source-form-card source-proof-card">
+                <div className="source-form-inner">
+                  <header className="source-form-heading">
+                    <h2>Submit Payment Proof</h2>
+                    <p>Upload your payment confirmation to complete registration</p>
+                  </header>
+                  <div className="source-proof-tip">💡 Make sure your reference number matches your payment receipt to avoid delays</div>
+                  <div className="source-input-stack">
+                    <label className="source-field">Reference Number *<input value={referenceNumber} onChange={(event) => setReferenceNumber(event.target.value)} placeholder="Enter your payment reference number" /></label>
+                    <label className="source-field source-file-field">Proof of Payment *<input type="file" accept="image/*" onChange={(event) => setProofFile(event.target.files?.[0] ?? null)} /></label>
+                  </div>
+                  {error && <div className="source-error" role="alert">{error}</div>}
+                  <div className="source-form-actions">
+                    <button type="button" className="source-secondary-button" onClick={() => advanceTo(3)}>Back</button>
+                    <button type="button" className="source-primary-button" onClick={confirmRegistration}>Confirm Registration</button>
+                  </div>
+                  <p className="source-verification-note">Your slot will be confirmed after payment verification</p>
+                </div>
+              </article>
+            </div>
+          )}
+
+          {submitted && (
+            <article className="source-form-card source-success-card">
+              <div className="source-form-inner">
+                <div className="source-success-icon" aria-hidden="true">✓</div>
+                <h2>Registration Submitted!</h2>
+                <p>Your registration has been received successfully.</p>
+                <p>Please wait for confirmation. We&apos;ll review your payment and confirm your slot.</p>
+              </div>
+            </article>
+          )}
+        </section>
+      </main>
+    </Shell>
+  );
+}
+
+function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [step, setStep] = useState<"email" | "password">("email");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+
+    if (step === "email") {
+      if (!email.trim()) return;
+      setStep("password");
+      return;
+    }
+
+    if (!password) return;
+    window.location.href = "/platform";
+  }
+
+  return (
+    <Shell active="login">
+      <section className="login-page">
+        <form className="login-card" onSubmit={submit}>
+          <span className="source-login-logo-space" aria-hidden="true" />
+
+          {step === "email" ? (
+            <>
+              <header className="source-login-heading">
+                <h1>Welcome back</h1>
+                <p>Log in to continue</p>
+              </header>
+              <label>
+                <span>Email*</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                  required
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <header className="source-login-heading">
+                <h1>Enter your password</h1>
+              </header>
+              <label>
+                <span>Password</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  autoFocus
+                  required
+                />
+              </label>
+            </>
+          )}
+
+          {error && <p className="source-login-error" role="alert">{error}</p>}
+
+          <button className="source-login-submit" type="submit">
+            Continue
+          </button>
+        </form>
+      </section>
+    </Shell>
+  );
+}
+
+function OrganizationsPage() {
+  return <LoginPage />;
+}
+
+function CommunityPage() {
+  return (
+    <Shell active="community">
+      <section className="community-page">
+        <div>
+          <span className="section-kicker">BE PART OF AWAKENING</span>
+          <h1>There’s a place for you in this movement.</h1>
+          <p>
+            Serve at a session, bring the experience to your team, become a
+            community partner, or help someone you care about find their reset.
+          </p>
+          <div className="button-row">
+            <Link className="button primary" href="/registration">
+              Join a Session
+            </Link>
+            <Link
+              className="button secondary"
+              href="/awakening-for-organizations"
+            >
+              Bring It To My Team
+            </Link>
+          </div>
+        </div>
+      </section>
+      <section className="community-gallery">
+        <img src="/awakening/gallery-1.jpeg" alt="Awakening session" />
+        <img src="/awakening/gallery-2.jpeg" alt="Awakening community" />
+        <img src="/awakening/gallery-3.jpeg" alt="Awakening reflection" />
+      </section>
+      <Footer />
+    </Shell>
+  );
+}
+
+export function AwakeningApp({ page }: { page: Page }) {
+  if (page === "home") return <HomePage />;
+  if (page === "schedules") return <SchedulesPage />;
+  if (page === "registration") return <RegistrationPage />;
+  if (page === "login") return <LoginPage />;
+  if (page === "organizations") return <OrganizationsPage />;
+  return <CommunityPage />;
+}
