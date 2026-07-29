@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Awakening PH Operations Platform",
   description: "The Awakening PH workspace for registrations, schedules, contacts, applications, and sales insights.",
+  robots: { index: false, follow: false, nocache: true },
 };
 
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {

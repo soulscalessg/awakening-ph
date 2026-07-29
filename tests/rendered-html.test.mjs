@@ -46,8 +46,50 @@ test("server-renders the finished Awakening home page and metadata", async () =>
   assert.match(html, /Join The Next Session/);
   assert.match(html, /Get Tickets To Next Session/);
   assert.match(html, /\/og-awakening\.png/);
+  assert.match(html, /rel="canonical" href="https:\/\/soulpreneur\.ph\/"/i);
+  assert.match(html, /application\/ld\+json/i);
+  assert.match(html, /Awakening Philippines/);
+  assert.match(html, /<html lang="en-PH"/i);
+  assert.match(html, /<h1[^>]*>Awakening PH — The Emotional Reset Experience<\/h1>/i);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/);
   assert.doesNotMatch(html, /codex-preview/);
+});
+
+test("publishes crawl directives and a public-only sitemap", async () => {
+  const robotsResponse = await render("/robots.txt", {
+    headers: { accept: "text/plain" },
+  });
+  assert.equal(robotsResponse.status, 200);
+  const robots = await robotsResponse.text();
+  assert.match(robots, /Allow: \//);
+  assert.match(robots, /Disallow: \/api\//);
+  assert.match(robots, /Disallow: \/platform\//);
+  assert.match(robots, /Sitemap: https:\/\/soulpreneur\.ph\/sitemap\.xml/);
+
+  const sitemapResponse = await render("/sitemap.xml", {
+    headers: { accept: "application/xml" },
+  });
+  assert.equal(sitemapResponse.status, 200);
+  const sitemap = await sitemapResponse.text();
+  assert.match(sitemap, /https:\/\/soulpreneur\.ph\/latest-schedules/);
+  assert.match(sitemap, /https:\/\/soulpreneur\.ph\/registration/);
+  assert.doesNotMatch(sitemap, /\/platform/);
+  assert.doesNotMatch(sitemap, /\/login/);
+});
+
+test("uses unique metadata for each public conversion route", async () => {
+  const routes = [
+    ["/latest-schedules", /Upcoming Emotional Reset Schedules \| Awakening PH/],
+    ["/registration", /Reserve Your Awakening Session \| Awakening PH/],
+    ["/awakening-for-organizations", /Awakening for Organizations \| Awakening PH/],
+    ["/be-part-of-awakening", /Be Part of Awakening \| Awakening PH/],
+  ];
+
+  for (const [pathname, title] of routes) {
+    const html = await renderedHtml(pathname);
+    assert.match(html, title);
+    assert.match(html, new RegExp(`https://soulpreneur\\.ph${pathname}`));
+  }
 });
 
 test("server-renders every public product route", async () => {

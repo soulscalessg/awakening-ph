@@ -117,7 +117,7 @@ function Shell({
           <SidebarToggleIcon />
         </button>
         <Link className="brand" href="/" aria-label="Awakening home">
-          <img src="/awakening/logo-transparent-2026.png" alt="Awakening" />
+          <img src="/awakening/logo-transparent-2026.png" alt="Awakening" width="1890" height="571" decoding="async" />
         </Link>
         <Link className="login-pill" href="/login">
           <span className="login-icon"><LoginIcon /></span>
@@ -167,7 +167,7 @@ function Footer() {
         </section>
         <div className="footer-lower">
           <div className="footer-brand">
-            <img src="/awakening/logo-transparent-2026.png" alt="Awakening" />
+            <img src="/awakening/logo-transparent-2026.png" alt="Awakening" width="1890" height="571" loading="lazy" decoding="async" />
             <p>Pause. Feel. Begin again.</p>
           </div>
           <nav className="footer-navigation" aria-label="Footer navigation">
@@ -323,6 +323,9 @@ function HomePage() {
             <img
               src="/awakening/logo-transparent-2026.png"
               alt="Awakening — The Emotional Reset Experience"
+              width="1890"
+              height="571"
+              decoding="async"
             />
             <p>Breathe in. Let go. Begin again.</p>
           </div>
@@ -349,6 +352,8 @@ function HomePage() {
           muted
           loop
           playsInline
+          preload="metadata"
+          poster="/awakening/carousel/full-community.jpeg"
           aria-hidden="true"
         />
         <div className="source-hero-shade" />
@@ -357,6 +362,7 @@ function HomePage() {
           <span>Philippines</span><span>Emotional reset · 2026</span>
         </div>
         <div className="source-hero-inner">
+          <h1 className="sr-only">Awakening PH — The Emotional Reset Experience</h1>
           <Link className="eyebrow-link" href="/latest-schedules">
             <b>NEW</b> See our next schedules →
           </Link>
@@ -364,6 +370,11 @@ function HomePage() {
             className="hero-logo"
             src="/awakening/logo-transparent-2026.png"
             alt="Awakening — The Emotional Reset Experience"
+            width="1890"
+            height="571"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
           />
           <p>
             If you’ve been stuck, overthinking, or just surviving… this is where
@@ -390,6 +401,7 @@ function HomePage() {
           muted
           loop
           playsInline
+          preload="none"
           aria-label="Time to feel, time to awaken"
         />
         {filmLoading && (
@@ -404,7 +416,7 @@ function HomePage() {
         <div className="source-partner-row" aria-label="Community partners">
           <div className="source-partner-track">
             {[...partnerImages, ...partnerImages].map(([src, alt], index) => (
-              <img src={src} alt={alt} key={`${src}-${index}`} />
+              <img src={src} alt={index < partnerImages.length ? alt : ""} loading="lazy" decoding="async" key={`${src}-${index}`} />
             ))}
           </div>
         </div>
@@ -414,7 +426,7 @@ function HomePage() {
         <div className="source-countdown-shade" />
         <div className="source-countdown-content">
           <span className="home-section-kicker">Your next reset begins in</span>
-          <h1>Next Schedule</h1>
+          <h2>Next Schedule</h2>
           <div className="source-countdown-grid" aria-label="Countdown">
             <div><strong>{countdown.days}</strong><span>DAYS</span></div>
             <div><strong>{countdown.hours}</strong><span>HOURS</span></div>
@@ -432,7 +444,7 @@ function HomePage() {
           <h2>Real people. Real release.<br /><em>A room that moves with you.</em></h2>
         </div>
         <div className="source-carousel-frame">
-          <img key={carouselImages[activeSlide]} src={carouselImages[activeSlide]} alt="Awakening experience" />
+          <img key={carouselImages[activeSlide]} src={carouselImages[activeSlide]} alt="Awakening participants sharing a guided emotional reset experience" width="2048" height="1365" loading="lazy" decoding="async" />
           <div className="home-gallery-index">0{activeSlide + 1} <span>/ 0{carouselImages.length}</span></div>
           <div className="home-gallery-controls">
             <button type="button" aria-label="Previous photo" onClick={() => setActiveSlide((slide) => (slide - 1 + carouselImages.length) % carouselImages.length)}>←</button>
@@ -471,7 +483,7 @@ function HomePage() {
 
       <section className="source-video-grid" aria-label="Awakening community videos" data-home-reveal>
         {communityVideos.map((src) => (
-          <video src={src} autoPlay muted loop playsInline key={src} />
+          <video src={src} autoPlay muted loop playsInline preload="none" key={src} />
         ))}
       </section>
 
@@ -723,7 +735,7 @@ function RegistrationPage() {
           </div>
           <div className="source-registration-hero-content">
             <span className="source-registration-kicker"><span aria-hidden="true">✣</span> Your reset starts here</span>
-            <img src="/awakening/logo-transparent-2026.png" alt="Awakening — The Emotional Reset Experience" />
+            <img src="/awakening/logo-transparent-2026.png" alt="Awakening — The Emotional Reset Experience" width="1890" height="571" decoding="async" />
             <h1>Reserve your place in the room.</h1>
             <p>A thoughtful four-step path from choosing your date to confirming your seat.</p>
           </div>

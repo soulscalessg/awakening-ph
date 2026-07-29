@@ -1499,7 +1499,7 @@ button:disabled {
   text-align: center;
 }
 
-.source-countdown h1 {
+.source-countdown :is(h1, h2) {
   height: 60px;
   margin: 0 0 48px;
   color: #fff;
@@ -4457,7 +4457,7 @@ body {
     height: auto;
   }
 
-  .source-countdown h1 {
+  .source-countdown :is(h1, h2) {
     font-size: 48px;
   }
 
@@ -6254,7 +6254,7 @@ body {
   height: auto;
 }
 
-.home-2026 .source-countdown h1 {
+.home-2026 .source-countdown :is(h1, h2) {
   height: auto;
   margin: 17px 0 46px;
   font-size: clamp(44px, 6vw, 76px);
@@ -8769,4 +8769,66 @@ button.platform-nav-parent {
 @media (max-width:680px) {
   .admin-registration-views { width: 100%; }.admin-registration-views button { flex: 1; justify-content: center; }
   .home-2026 .footer-invitation,.registration-2026 .footer-invitation { padding: 42px 22px; }
+}
+
+/* Cross-device stability and touch accessibility. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-width: 320px;
+  overflow-x: clip;
+}
+
+img,
+video {
+  max-width: 100%;
+}
+
+textarea {
+  font: inherit;
+}
+
+textarea:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 3px;
+}
+
+.topbar {
+  height: calc(64px + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+}
+
+.sidebar {
+  top: calc(64px + env(safe-area-inset-top));
+  padding-bottom: max(18px, env(safe-area-inset-bottom));
+}
+
+.main-content {
+  padding-top: calc(64px + env(safe-area-inset-top));
+}
+
+@media (pointer: coarse) {
+  .sidebar a,
+  .footer-navigation a,
+  .button,
+  .source-primary-button,
+  .source-secondary-button,
+  .source-payment-grid > button,
+  .home-gallery-controls button,
+  .mobile-menu,
+  .login-pill {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar { padding-right: max(12px, env(safe-area-inset-right)); padding-left: max(12px, env(safe-area-inset-left)); }
+  .sidebar { width: min(88vw, 320px); padding-left: max(12px, env(safe-area-inset-left)); }
+  .source-countdown-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .footer-invitation h2 { font-size: clamp(34px, 12vw, 48px); overflow-wrap: anywhere; }
+  .footer-navigation a { display: inline-flex; align-items: center; }
+  .footer-signoff { padding-bottom: max(22px, env(safe-area-inset-bottom)); }
 }
