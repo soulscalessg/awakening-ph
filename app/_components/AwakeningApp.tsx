@@ -99,7 +99,7 @@ function Shell({
           <SidebarToggleIcon />
         </button>
         <Link className="brand" href="/" aria-label="Awakening home">
-          <img src="/awakening/logo-strip.png" alt="Awakening" />
+          <img src="/awakening/logo-transparent-2026.png" alt="Awakening" />
         </Link>
         <Link className="login-pill" href="/login">
           <span className="login-icon"><LoginIcon /></span>
@@ -143,7 +143,7 @@ function Footer() {
     <footer className="footer">
       <div className="footer-inner">
         <div className="footer-brand">
-          <img src="/awakening/logo-strip.png" alt="Awakening" />
+          <img src="/awakening/logo-transparent-2026.png" alt="Awakening" />
           <p>Philippines as a FIRST-WORLD country.</p>
         </div>
         <ul className="socials" aria-label="Social media">
@@ -290,7 +290,7 @@ function HomePage() {
           <div className="home-intro-copy">
             <span className="home-intro-kicker">A guided moment to</span>
             <img
-              src="/awakening/logo-hero.png"
+              src="/awakening/logo-transparent-2026.png"
               alt="Awakening — The Emotional Reset Experience"
             />
             <p>Breathe in. Let go. Begin again.</p>
@@ -331,7 +331,7 @@ function HomePage() {
           </Link>
           <img
             className="hero-logo"
-            src="/awakening/logo-hero.png"
+            src="/awakening/logo-transparent-2026.png"
             alt="Awakening — The Emotional Reset Experience"
           />
           <p>
@@ -649,22 +649,55 @@ function RegistrationPage() {
   }
 
   return (
-    <Shell active="registration">
+    <div className="registration-2026">
+      <Shell active="registration">
       <main className="source-registration">
         <section className="source-registration-hero">
           <div className="source-registration-hero-glow" aria-hidden="true" />
+          <div className="registration-orbit" aria-hidden="true"><span /><span /></div>
+          <div className="registration-hero-meta" aria-hidden="true">
+            <span>Awakening Philippines</span>
+            <span>Guided registration · 01—04</span>
+          </div>
           <div className="source-registration-hero-content">
-            <span className="source-registration-kicker"><span aria-hidden="true">✣</span> Save Your Slot</span>
-            <h1>Awakening PH</h1>
-            <p> </p>
+            <span className="source-registration-kicker"><span aria-hidden="true">✣</span> Your reset starts here</span>
+            <img src="/awakening/logo-transparent-2026.png" alt="Awakening — The Emotional Reset Experience" />
+            <h1>Reserve your place in the room.</h1>
+            <p>A thoughtful four-step path from choosing your date to confirming your seat.</p>
           </div>
         </section>
 
         <div className="source-progress-wrap">
+          <div className="registration-progress-label">
+            <span>Registration journey</span>
+            <strong>{submitted ? "Complete" : `Step ${step} of 4`}</strong>
+          </div>
           <RegistrationProgress step={submitted ? 5 : step} />
         </div>
 
         <section className="source-registration-content">
+          <aside className="registration-ticket-panel">
+            <div className="registration-ticket-brand">
+              <span>AWAKENING / ADMIT ONE</span>
+              <b aria-hidden="true">✣</b>
+            </div>
+            <div className="registration-ticket-copy">
+              <small>Your invitation to</small>
+              <h2>Pause.<br /><em>Feel.</em><br />Begin again.</h2>
+              <p>One guided day in a safe room built for honest reflection, release, and renewed direction.</p>
+            </div>
+            <dl className="registration-ticket-details">
+              <div><dt>Session</dt><dd>{schedule || "Choose your date"}</dd></div>
+              <div><dt>Guests</dt><dd>{quantity} {quantity === 1 ? "ticket" : "tickets"}</dd></div>
+              <div><dt>Total</dt><dd>PHP {total.toLocaleString("en-PH")}</dd></div>
+            </dl>
+            <div className="registration-ticket-footer">
+              <span>Secure registration</span>
+              <span aria-hidden="true">PH · 2026</span>
+            </div>
+          </aside>
+
+          <div className="registration-form-stage" key={submitted ? "complete" : step}>
           {!submitted && step === 1 && (
             <article className="source-form-card source-ticket-card">
               <div className="source-form-inner">
@@ -842,9 +875,11 @@ function RegistrationPage() {
               </div>
             </article>
           )}
+          </div>
         </section>
       </main>
-    </Shell>
+      </Shell>
+    </div>
   );
 }
 
