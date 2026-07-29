@@ -6,8 +6,6 @@ import {
   BuildingIcon,
   CalendarIcon,
   FacebookIcon,
-  InstagramIcon,
-  LinkedInIcon,
   LoginIcon,
   MapPinIcon,
   ScheduleCalendarIcon,
@@ -23,56 +21,69 @@ type Page =
   | "organizations"
   | "community";
 
-const registrationOptions = [
-  "July 26 - Manila",
-  "July 25 - Cebu",
-  "August 8 - Baguio",
-  "August 15 - Manila",
-  "August 22 - Olongapo",
-  "September 5 - Pampanga",
-  "September 12 - Rizal",
-  "September 19 - Manila",
-  "October 10 - Manila",
-  "October 17 - Laguna",
-  "November 7 - Marikina",
-  "November 21 - Manila",
-  "November 28 - Quezon",
-  "December 5 - Manila",
-] as const;
+type PublicSchedule = {
+  id: string;
+  event_at: string;
+  venue: string;
+  city?: string | null;
+  capacity?: number | null;
+  status: string;
+};
 
-const latestSchedules = [
-  { date: "Saturday, May 30, 2026 at 9:00 AM", venue: "Davao" },
-  { date: "Sunday, May 31, 2026 at 9:00 AM", venue: "General Santos" },
-  {
-    date: "Saturday, June 20, 2026 at 9:00 AM",
-    venue: "House of Transformation, Ayala the 30th, Pasig",
-  },
-  { date: "Monday, July 27, 2026 at 9:00 AM", venue: "Cebu" },
-  {
-    date: "Saturday, July 18, 2026 at 9:00 AM",
-    venue: "House of Transformation, Ayala the 30th, Pasig",
-  },
-  {
-    date: "Monday, July 27, 2026 at 9:00 AM",
-    venue: "House of Transformation, Ayala the 30th, Pasig",
-  },
-  {
-    date: "Saturday, August 15, 2026 at 9:00 AM",
-    venue: "House of Transformation, Ayala the 30th, Pasig",
-  },
-  {
-    date: "Saturday, September 19, 2026 at 9:00 AM",
-    venue: "House of Transformation, Ayala the 30th, Pasig",
-  },
-  {
-    date: "Saturday, October 10, 2026 at 9:00 AM",
-    venue: "House of Transformation, Ayala the 30th, Pasig",
-  },
-  {
-    date: "Saturday, November 21, 2026 at 9:00 AM",
-    venue: "House of Transformation, Ayala the 30th, Pasig",
-  },
-] as const;
+const fallbackSchedules: PublicSchedule[] = [
+  { id: "aug-15-manila", event_at: "2026-08-15T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
+  { id: "sep-19-manila", event_at: "2026-09-19T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
+  { id: "oct-10-manila", event_at: "2026-10-10T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
+  { id: "nov-21-manila", event_at: "2026-11-21T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
+  { id: "dec-05-manila", event_at: "2026-12-05T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
+];
+
+function formatScheduleDate(eventAt: string, includeWeekday = true) {
+  return new Intl.DateTimeFormat("en-PH", {
+    ...(includeWeekday ? { weekday: "long" as const } : {}),
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "Asia/Manila",
+  }).format(new Date(eventAt));
+}
+
+function scheduleOptionLabel(schedule: PublicSchedule) {
+  const place = schedule.city || schedule.venue;
+  return `${formatScheduleDate(schedule.event_at, false)} · ${place}`;
+}
+
+function usePublicSchedules() {
+  const [schedules, setSchedules] = useState<PublicSchedule[]>(fallbackSchedules);
+  const [live, setLive] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/public-schedules", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Schedules unavailable");
+        const result = (await response.json()) as { data?: PublicSchedule[] };
+        if (active && result.data?.length) {
+          setSchedules(result.data);
+          setLive(true);
+        }
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  return { schedules, live };
+}
+
+function AmbientLights() {
+  return (
+    <div className="ambient-lights" aria-hidden="true">
+      <span /><span /><span /><span /><span />
+    </div>
+  );
+}
 
 function Shell({
   active,
@@ -87,6 +98,7 @@ function Shell({
 
   return (
     <div className={`site-shell ${initialLoading ? "is-initial-loading" : ""}`}>
+      <AmbientLights />
       <header className="topbar">
         <button
           className="mobile-menu"
@@ -147,9 +159,7 @@ function Footer() {
           <p>Philippines as a FIRST-WORLD country.</p>
         </div>
         <ul className="socials" aria-label="Social media">
-          <li><a href="https://www.facebook.com/people/Softr/" target="_blank" rel="noreferrer" aria-label="Facebook"><FacebookIcon /></a></li>
-          <li><a href="https://www.instagram.com/softr.io/" target="_blank" rel="noreferrer" aria-label="Instagram"><InstagramIcon /></a></li>
-          <li><a href="https://www.linkedin.com/company/softr/" target="_blank" rel="noreferrer" aria-label="LinkedIn"><LinkedInIcon /></a></li>
+          <li><a href="https://www.facebook.com/search/top?q=Awakened%20Nation" target="_blank" rel="noreferrer" aria-label="Awakened Nation on Facebook"><FacebookIcon /></a></li>
         </ul>
       </div>
     </footer>
@@ -185,6 +195,8 @@ function HomePage() {
     "https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/da058278-4dfc-4c36-bd5d-88d0c1dd4a1a.qt",
     "https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/ec5d8d82-650f-48a6-90d5-58e58335e0aa.mp4",
   ];
+  const { schedules: publicSchedules } = usePublicSchedules();
+  const nextSchedule = publicSchedules[0];
   const [activeSlide, setActiveSlide] = useState(4);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [introVisible, setIntroVisible] = useState(true);
@@ -256,7 +268,7 @@ function HomePage() {
   }, []);
 
   useEffect(() => {
-    const nextSession = new Date("2026-08-15T09:00:00+08:00").getTime();
+    const nextSession = new Date(nextSchedule.event_at).getTime();
     const updateCountdown = () => {
       const remaining = Math.max(0, nextSession - Date.now());
       const days = Math.floor(remaining / 86_400_000);
@@ -274,7 +286,7 @@ function HomePage() {
     updateCountdown();
     const timer = window.setInterval(updateCountdown, 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [nextSchedule.event_at]);
 
   const filmLoading = !initialLoadComplete;
 
@@ -390,7 +402,7 @@ function HomePage() {
             <div><strong>{countdown.minutes}</strong><span>MINUTES</span></div>
             <div><strong>{countdown.seconds}</strong><span>SECONDS</span></div>
           </div>
-          <p>August 15 · House of Transformation, Pasig</p>
+          <p>{formatScheduleDate(nextSchedule.event_at, false)} · {nextSchedule.venue}</p>
           <Link className="home-text-link" href="/registration">Reserve this date <span>↗</span></Link>
         </div>
       </section>
@@ -512,6 +524,8 @@ function HomePage() {
 }
 
 function SchedulesPage() {
+  const { schedules, live } = usePublicSchedules();
+
   return (
     <Shell active="schedules">
       <section className="schedules-page">
@@ -519,6 +533,7 @@ function SchedulesPage() {
         <div className="schedule-glow blue" />
         <div className="schedules-content">
           <header className="schedules-heading">
+            <span className="schedules-live-state"><i />{live ? "Live schedule" : "Upcoming schedule"}</span>
             <h1>Awakening: An Emotional Reset Experience</h1>
             <p>
               Join us for a powerful reset that breaks old patterns and moves
@@ -526,10 +541,10 @@ function SchedulesPage() {
             </p>
           </header>
           <div className="schedule-list">
-            {latestSchedules.map((schedule, index) => (
+            {schedules.map((schedule, index) => (
               <article
                 className="schedule-card"
-                key={`${schedule.date}-${schedule.venue}-${index}`}
+                key={schedule.id}
                 style={{ animationDelay: `${index * 150}ms` }}
               >
                 <div className="schedule-card-wash" />
@@ -540,7 +555,7 @@ function SchedulesPage() {
                     </div>
                     <div>
                       <span>Date &amp; Time</span>
-                      <strong>{schedule.date}</strong>
+                      <strong>{formatScheduleDate(schedule.event_at)}</strong>
                     </div>
                   </div>
                   <div className="schedule-detail">
@@ -590,6 +605,7 @@ function RegistrationProgress({ step }: { step: number }) {
 }
 
 function RegistrationPage() {
+  const { schedules: publicSchedules } = usePublicSchedules();
   const [step, setStep] = useState(1);
   const [schedule, setSchedule] = useState("");
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -723,7 +739,9 @@ function RegistrationPage() {
                     </button>
                     {scheduleOpen && (
                       <div className="source-select-menu" id="registration-date-options" role="listbox">
-                        {registrationOptions.map((option) => (
+                        {publicSchedules.map((item) => {
+                          const option = scheduleOptionLabel(item);
+                          return (
                           <button
                             type="button"
                             role="option"
@@ -738,7 +756,8 @@ function RegistrationPage() {
                             🇵🇭 {option} — PHP 1,499
                             {schedule === option && <span aria-hidden="true">✓</span>}
                           </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -962,7 +981,108 @@ function LoginPage() {
 }
 
 function OrganizationsPage() {
-  return <LoginPage />;
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submitOrganization(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+    const data = new FormData(event.currentTarget);
+    try {
+      const response = await fetch("/api/public-organization-application", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: data.get("name"),
+          email: data.get("email"),
+          phone: data.get("phone"),
+          business_name: data.get("business_name"),
+          industry: data.get("industry"),
+          employee_count: data.get("employee_count"),
+          discovery_source: data.get("discovery_source"),
+        }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setError(result.error ?? "Unable to send your inquiry right now.");
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setError("Unable to send your inquiry right now. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="organization-2026">
+      <Shell active="organizations">
+        <main className="organization-business-page">
+          <section className="organization-business-hero">
+            <div className="organization-business-image" aria-hidden="true">
+              <img src="/awakening/carousel/full-community.jpeg" alt="" />
+            </div>
+            <div className="organization-business-shade" />
+            <div className="organization-business-copy">
+              <span className="home-section-kicker">Awakening for organizations</span>
+              <h1>Bring the reset<br /><em>into your workplace.</em></h1>
+              <p>A facilitated emotional reset for founders, leadership teams, and organizations ready to create healthier conversations and clearer direction.</p>
+              <div className="organization-business-points">
+                <span>Leadership alignment</span><span>Team connection</span><span>Culture reset</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="organization-inquiry-section">
+            <div className="organization-inquiry-intro">
+              <span className="home-section-kicker">Start the conversation</span>
+              <h2>Tell us about your organization.</h2>
+              <p>Share a few details and the Awakening team will contact you to explore the right experience for your people.</p>
+              <div className="organization-process">
+                <div><b>01</b><span>Tell us about your team</span></div>
+                <div><b>02</b><span>We shape the right format</span></div>
+                <div><b>03</b><span>Bring Awakening to your people</span></div>
+              </div>
+            </div>
+
+            {submitted ? (
+              <div className="organization-form-card organization-form-success" role="status">
+                <span aria-hidden="true">✓</span>
+                <h2>Your inquiry is with us.</h2>
+                <p>The Awakening team will review your organization details and reach out to continue the conversation.</p>
+                <Link href="/">Return to Awakening</Link>
+              </div>
+            ) : (
+              <form className="organization-form-card" onSubmit={submitOrganization}>
+                <header><span>Business inquiry</span><strong>All fields marked * are required</strong></header>
+                <div className="organization-field-grid">
+                  <label>Owner / CEO name *<input name="name" required placeholder="Your full name" /></label>
+                  <label>Business name *<input name="business_name" required placeholder="Company or organization" /></label>
+                  <label>Work email *<input name="email" type="email" required placeholder="you@company.com" /></label>
+                  <label>Contact number *<input name="phone" required placeholder="+63" /></label>
+                  <label>Industry<input name="industry" placeholder="Your industry" /></label>
+                  <label>Team size<input name="employee_count" type="number" min="1" placeholder="Number of employees" /></label>
+                </div>
+                <label className="organization-wide-field">How did you hear about Awakening?
+                  <select name="discovery_source" defaultValue="">
+                    <option value="" disabled>Select an option</option>
+                    <option>Facebook</option><option>Friend or colleague</option><option>Previous participant</option><option>Awakening event</option><option>Other</option>
+                  </select>
+                </label>
+                {error && <p className="source-error" role="alert">{error}</p>}
+                <button type="submit" disabled={submitting}>{submitting ? "Sending inquiry…" : "Start the conversation"}<span>↗</span></button>
+                <small>Your information is securely saved to the Awakening operations platform.</small>
+              </form>
+            )}
+          </section>
+        </main>
+        <Footer />
+      </Shell>
+    </div>
+  );
 }
 
 function CommunityPage() {

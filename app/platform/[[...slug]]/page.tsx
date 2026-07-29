@@ -1,7 +1,7 @@
 import { PlatformApp, type PlatformPage } from "../../_components/PlatformApp";
 
 const pageMap: Record<string, PlatformPage> = {
-  "": "system-information",
+  "": "registration-center",
   account: "account",
   "system-information": "system-information",
   contacts: "contacts",
@@ -19,6 +19,6 @@ const pageMap: Record<string, PlatformPage> = {
 
 export default async function PlatformRoute({ params }: { params: Promise<{ slug?: string[] }> }) {
   const { slug = [] } = await params;
-  const page = pageMap[slug.join("/")] ?? "system-information";
+  const page = pageMap[slug.join("/")] ?? "registration-center";
   return <PlatformApp page={page} />;
 }

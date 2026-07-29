@@ -19,12 +19,12 @@ type PlatformPage =
   | "applications-sponsorship";
 
 const schedules = [
-  ["May 30, 2026 · 9:00 AM", "Davao", "pink"],
-  ["May 31, 2026 · 9:00 AM", "General Santos", "amber"],
-  ["June 20, 2026 · 9:00 AM", "House of Transformation, Ayala the 30th, Pasig", "purple"],
-  ["July 18, 2026 · 9:00 AM", "House of Transformation, Ayala the 30th, Pasig", "purple"],
-  ["July 27, 2026 · 9:00 AM", "Cebu", "yellow"],
-  ["August 15, 2026 · 9:00 AM", "House of Transformation, Ayala the 30th, Pasig", "purple"],
+  ["2026-05-30T09:00:00+08:00", "Davao", "scheduled"],
+  ["2026-05-31T09:00:00+08:00", "General Santos", "scheduled"],
+  ["2026-06-20T09:00:00+08:00", "House of Transformation, Ayala the 30th, Pasig", "scheduled"],
+  ["2026-07-18T09:00:00+08:00", "House of Transformation, Ayala the 30th, Pasig", "scheduled"],
+  ["2026-07-27T09:00:00+08:00", "Cebu", "scheduled"],
+  ["2026-08-15T09:00:00+08:00", "House of Transformation, Ayala the 30th, Pasig", "scheduled"],
 ] as const;
 
 const registrants = [
@@ -34,12 +34,15 @@ const registrants = [
 ];
 
 const navSections = [
+  { label: "Registration Dashboard", icon: "◈", href: "/platform", pages: ["registration-center"] },
+  { label: "Schedule Manager", icon: "◷", href: "/platform/seminar-schedule-management", pages: ["seminar-schedule-management"] },
+  { label: "Organization Inquiries", icon: "◇", href: "/platform/applications/organizations", pages: ["applications-organizations"] },
   { label: "Account Settings", icon: "⚙", href: "/platform/account", pages: ["account"] },
   { label: "My Platform", icon: "◫", pages: ["system-information"], children: [["System Information", "/platform/system-information", "system-information"]] },
   { label: "Resources", icon: "▣", pages: ["contacts", "document-hub", "photo-library"], children: [["Contacts", "/platform/contacts", "contacts"], ["Document Hub", "/platform/document-hub", "document-hub"], ["Photo Library", "/platform/photo-library", "photo-library"]] },
-  { label: "Sales & Administration", icon: "◌", pages: ["sales-revenue", "crm", "registration-center", "seminar-schedule-management"], children: [["Profit & Sales Manager", "/platform/sales-revenue", "sales-revenue"], ["Customer Relationship Manager", "/platform/crm", "crm"], ["Registration Center", "/platform/registration-center", "registration-center"], ["Seminar Schedule Management", "/platform/seminar-schedule-management", "seminar-schedule-management"]] },
+  { label: "Sales & Administration", icon: "◌", pages: ["sales-revenue", "crm"], children: [["Profit & Sales Manager", "/platform/sales-revenue", "sales-revenue"], ["Customer Relationship Manager", "/platform/crm", "crm"]] },
   { label: "Latest Schedules", icon: "▢", href: "/platform/latest-schedules", pages: ["latest-schedules"] },
-  { label: "Applications", icon: "◧", pages: ["applications-organizations", "applications-staffing", "applications-sponsorship"], children: [["For Organizations", "/platform/applications/organizations", "applications-organizations"], ["For Staffing Team", "/platform/applications/staffing", "applications-staffing"], ["For Sponsorship", "/platform/applications/sponsorship", "applications-sponsorship"]] },
+  { label: "Other Applications", icon: "◧", pages: ["applications-staffing", "applications-sponsorship"], children: [["For Staffing Team", "/platform/applications/staffing", "applications-staffing"], ["For Sponsorship", "/platform/applications/sponsorship", "applications-sponsorship"]] },
 ] as const;
 
 type StoredRecord = {
@@ -53,6 +56,13 @@ type StoredRecord = {
   code?: string;
   status?: string;
   created_at?: string;
+  quantity?: number;
+  total_amount?: number | string;
+  city?: string;
+  capacity?: number;
+  business_name?: string;
+  industry?: string;
+  employee_count?: number;
   [key: string]: unknown;
 };
 
@@ -97,7 +107,21 @@ function usePlatformRecords(resource: string, initial: StoredRecord[] = []) {
     setRecords((current) => current.filter((record) => record.id !== id));
   }
 
-  return { records, connection, createRecord, deleteRecord };
+  async function updateRecord(id: string | undefined, payload: StoredRecord) {
+    if (!id) throw new Error("Record id is required.");
+    const response = await fetch(`/api/platform-data/${resource}?id=${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error("Unable to update this record.");
+    const result = (await response.json()) as { data: StoredRecord };
+    setRecords((current) => current.map((record) => record.id === id ? result.data : record));
+    setConnection("live");
+    return result.data;
+  }
+
+  return { records, connection, createRecord, updateRecord, deleteRecord };
 }
 
 function DataConnectionBadge({ state }: { state: "connecting" | "live" | "unavailable" }) {
@@ -107,13 +131,16 @@ function DataConnectionBadge({ state }: { state: "connecting" | "live" | "unavai
 
 function PlatformShell({ page, children }: { page: PlatformPage; children: ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
 
   return (
     <div className="platform-shell">
       <header className="platform-topbar">
         <button className="platform-menu-button" type="button" aria-label="Toggle navigation" onClick={() => setMobileNav((open) => !open)}>☰</button>
-        <Link href="/platform" className="platform-brand" aria-label="Awakening platform home"><img src="/awakening/logo-strip.png" alt="Awakening" /></Link>
-        <button
+        <Link href="/platform" className="platform-brand" aria-label="Awakening platform home"><img src="/awakening/logo-transparent-2026.png" alt="Awakening" /><span>Control Room</span></Link>
+        <div className="platform-topbar-actions">
+          <Link href="/" target="_blank">View public site ↗</Link>
+          <button
           className="platform-avatar"
           type="button"
           aria-label="Log out"
@@ -122,20 +149,27 @@ function PlatformShell({ page, children }: { page: PlatformPage; children: React
             await fetch("/api/platform-logout", { method: "POST" });
             window.location.href = "/";
           }}
-        >SS</button>
+          >AN</button>
+        </div>
       </header>
       <aside className={`platform-sidebar ${mobileNav ? "is-open" : ""}`}>
         <nav aria-label="Platform navigation">
           {navSections.map((section) => {
             const expanded = section.pages.includes(page as never);
+            const manuallyOpen = openGroups.includes(section.label);
             return (
-              <div className={`platform-nav-group ${expanded ? "is-expanded" : ""}`} key={section.label}>
+              <div className={`platform-nav-group ${expanded || manuallyOpen ? "is-expanded" : ""}`} key={section.label}>
                 {"href" in section ? (
                   <Link className={expanded ? "is-active" : ""} href={section.href} onClick={() => setMobileNav(false)}><span>{section.icon}</span><b>{section.label}</b></Link>
                 ) : (
-                  <div className="platform-nav-parent"><span>{section.icon}</span><b>{section.label}</b><i>{expanded ? "⌄" : "›"}</i></div>
+                  <button
+                    className="platform-nav-parent"
+                    type="button"
+                    aria-expanded={expanded || manuallyOpen}
+                    onClick={() => setOpenGroups((current) => current.includes(section.label) ? current.filter((label) => label !== section.label) : [...current, section.label])}
+                  ><span>{section.icon}</span><b>{section.label}</b><i>{expanded || manuallyOpen ? "⌄" : "›"}</i></button>
                 )}
-                {"children" in section && expanded && (
+                {"children" in section && (expanded || manuallyOpen) && (
                   <div className="platform-subnav">
                     {section.children.map(([label, href, childPage]) => (
                       <Link className={page === childPage ? "is-active" : ""} href={href} key={href} onClick={() => setMobileNav(false)}>{label}</Link>
@@ -190,6 +224,42 @@ function Modal({ title, onClose, onSave }: { title: string; onClose: () => void;
         <label>Email address<input name="email" type="email" required placeholder="name@example.com" /></label>
         <label>Contact number<input name="phone" placeholder="+63" /></label>
         <footer><button type="button" onClick={onClose}>Cancel</button><button className="platform-primary" type="submit">Save record</button></footer>
+      </form>
+    </div>
+  );
+}
+
+function ScheduleModal({ record, onClose, onSave }: { record?: StoredRecord; onClose: () => void; onSave: (payload: StoredRecord) => Promise<void> }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const localEventAt = record?.event_at ? (() => {
+    const date = new Date(record.event_at);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  })() : "";
+
+  return (
+    <div className="platform-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <form className="platform-modal schedule-editor-modal" onSubmit={(event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        setSaving(true);
+        setError("");
+        void onSave({
+          event_at: new Date(String(data.get("event_at"))).toISOString(),
+          venue: String(data.get("venue")),
+          city: String(data.get("city")),
+          capacity: Math.max(0, Number(data.get("capacity")) || 0),
+          status: String(data.get("status") || "scheduled"),
+        }).catch(() => setError("This schedule could not be saved. Please check the details and try again.")).finally(() => setSaving(false));
+      }} onMouseDown={(event) => event.stopPropagation()}>
+        <header><div><span className="admin-eyebrow">Public schedule</span><h2>{record ? "Edit session" : "Create a session"}</h2></div><button type="button" aria-label="Close" onClick={onClose}>×</button></header>
+        <p>Publishing a session updates Latest Schedules and Secure My Slot automatically.</p>
+        <label>Date and time<input name="event_at" type="datetime-local" required defaultValue={localEventAt} /></label>
+        <label>Venue<input name="venue" required defaultValue={record?.venue ?? ""} placeholder="House of Transformation, Ayala the 30th" /></label>
+        <div className="schedule-editor-grid"><label>City<input name="city" defaultValue={record?.city ?? ""} placeholder="Pasig" /></label><label>Capacity<input name="capacity" type="number" min="0" defaultValue={record?.capacity ?? ""} placeholder="100" /></label></div>
+        <label>Publishing status<select name="status" defaultValue={record?.status ?? "scheduled"}><option value="scheduled">Published</option><option value="draft">Draft</option><option value="cancelled">Cancelled</option></select></label>
+        {error && <div className="platform-inline-error" role="alert">{error}</div>}
+        <footer><button type="button" onClick={onClose}>Cancel</button><button className="platform-primary" type="submit" disabled={saving}>{saving ? "Saving…" : record ? "Save changes" : "Publish schedule"}</button></footer>
       </form>
     </div>
   );
@@ -295,20 +365,66 @@ function CRM() {
 }
 
 function RegistrationCenter() {
-  const [tab, setTab] = useState<"insights" | "menu">("insights");
   const [query, setQuery] = useState("");
+  const [saveError, setSaveError] = useState("");
   const seededRegistrants = registrants.map((record) => ({ ...record, event_date: record.date, status: record.status === "Paid" ? "paid" : "for_confirmation" }));
-  const { records, connection } = usePlatformRecords("registrations", seededRegistrants);
+  const { records, connection, updateRecord } = usePlatformRecords("registrations", seededRegistrants);
   const filtered = records.filter((record) => `${record.name ?? ""} ${record.email ?? ""} ${record.code ?? ""}`.toLowerCase().includes(query.toLowerCase()));
+  const tickets = records.reduce((sum, record) => sum + (Number(record.quantity) || 1), 0);
+  const revenue = records.reduce((sum, record) => sum + (Number(record.total_amount) || 0), 0);
+  const pending = records.filter((record) => record.status !== "paid").length;
+
+  function exportRegistrations() {
+    const header = ["Code", "Name", "Email", "Phone", "Schedule", "Quantity", "Amount", "Status"];
+    const rows = records.map((record) => [record.code, record.name, record.email, record.phone, record.event_date, record.quantity, record.total_amount, record.status]);
+    const csv = [header, ...rows].map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    link.download = `awakening-registrations-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
   return (
     <PlatformShell page="registration-center">
-      <GradientBanner />
-      <section className="platform-dashboard registration-dashboard">
-        <header className="registration-title"><div><h1>REGISTRATION CENTER</h1><p>Your complete view of every attendee.</p></div><DataConnectionBadge state={connection} /></header>
-        <div className="platform-tabs"><button className={tab === "insights" ? "is-active" : ""} onClick={() => setTab("insights")} type="button">☼ Insights</button><button className={tab === "menu" ? "is-active" : ""} onClick={() => setTab("menu")} type="button">↗ Quick Menu</button></div>
-        {tab === "insights" ? <div className="platform-metrics three"><MetricCard label="Total Tickets Sold" value="424" /><MetricCard label="Ticket Sales This Month" value="PHP 181,379.00" /><MetricCard label="Total Gross Profit" value="PHP 635,576.00" /><MetricCard label="Payments for Confirmation" value="2" /><MetricCard label="No. of Registrants This Month" value="71" /><MetricCard label="Total No. of Registrants" value="262" /></div> : <QuickLinks items={["Seminar Schedule Management", "Awakening For Organizations Applications", "Sponsorship Applications", "Staffing Applications"]} />}
-        <GradientBanner><div className="platform-banner-greeting"><span>SS</span><div><small>Great to see you, SoulScale</small><h1>Pick up right where you left off</h1></div><SearchBar value={query} onChange={setQuery} placeholder="Search..." /></div></GradientBanner>
-        <div className="registration-manager"><div><PageIntro title="REGISTRATION MANAGER" copy="View and manage all event registrants." search={query} onSearch={setQuery} /><div className="platform-filter-row"><button>Confirmation Status⌄</button><button>Date Attending⌄</button><button className="platform-primary">⇩ Export</button></div><div className="registrant-list">{filtered.map((record) => { const paid = record.status === "paid" || record.status === "Paid"; return <article key={String(record.id ?? record.code)}><span className="receipt-thumb">RECEIPT</span><div><b>{String(record.code ?? "NEW")}</b><em>{String(record.event_date ?? "Date pending")}</em><strong>{String(record.name ?? "Registrant")}</strong><a href={`mailto:${String(record.email ?? "")}`}>✉ {String(record.email ?? "—")}</a><a href={`tel:${String(record.phone ?? "")}`}>▯ {String(record.phone ?? "—")}</a><small className={paid ? "paid" : "pending"}>{paid ? "Paid" : "For Confirmation"}</small></div><div><button className="platform-primary" type="button">✎ Edit</button><button type="button">Change Status</button></div></article>; })}</div></div><aside className="platform-calendar"><header><b>Jul 2026</b><div><button>Today</button><button>‹</button><button>›</button></div></header><div className="calendar-grid">{"SMTWTFS".split("").map((day, index) => <b key={`${day}-${index}`}>{day}</b>)}{Array.from({ length: 35 }, (_, index) => <span className={index === 31 ? "today" : ""} key={index}>{index < 3 ? 28 + index : index - 2}</span>)}</div></aside></div>
+      <section className="admin-control-room">
+        <header className="admin-control-hero">
+          <div><span className="admin-eyebrow">Awakening operations · Live control room</span><h1>Registration<br /><em>dashboard.</em></h1><p>Everything arriving from Secure My Slot, organized in one calm command center.</p></div>
+          <div className="admin-control-actions"><DataConnectionBadge state={connection} /><Link href="/platform/seminar-schedule-management" className="platform-primary">Manage schedules ↗</Link></div>
+        </header>
+
+        <div className="admin-live-strip"><span><i />Live from Supabase</span><p>{pending ? `${pending} payment${pending === 1 ? "" : "s"} waiting for confirmation` : "All payments reviewed"}</p><time>{new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date())}</time></div>
+
+        <div className="admin-metric-grid">
+          <article><span>Total registrations</span><strong>{records.length}</strong><small>People in the database</small></article>
+          <article><span>Tickets reserved</span><strong>{tickets}</strong><small>Across all schedules</small></article>
+          <article><span>Gross bookings</span><strong>₱{revenue.toLocaleString("en-PH")}</strong><small>Submitted registration value</small></article>
+          <article className={pending ? "needs-attention" : ""}><span>For confirmation</span><strong>{pending}</strong><small>{pending ? "Needs your attention" : "Nothing pending"}</small></article>
+        </div>
+
+        <section className="admin-registration-panel">
+          <header><div><span className="admin-eyebrow">Attendee database</span><h2>Registrations</h2><p>Search attendees, review their payment state, and confirm them in one click.</p></div><div><SearchBar value={query} onChange={setQuery} placeholder="Search name, email, or code" /><button type="button" onClick={exportRegistrations}>Export CSV</button></div></header>
+          {saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}
+          <div className="admin-registration-table">
+            <div className="admin-table-head"><span>Attendee</span><span>Schedule</span><span>Booking</span><span>Status</span><span>Action</span></div>
+            {filtered.length ? filtered.map((record) => {
+              const paid = record.status === "paid" || record.status === "Paid";
+              return (
+                <article key={String(record.id ?? record.code)}>
+                  <div className="admin-attendee"><b>{String(record.name ?? "Registrant").slice(0, 1)}</b><span><strong>{String(record.name ?? "Registrant")}</strong><a href={`mailto:${String(record.email ?? "")}`}>{String(record.email ?? "—")}</a><small>{String(record.code ?? "NEW")}</small></span></div>
+                  <div><strong>{String(record.event_date ?? "Date pending")}</strong><small>{String(record.phone ?? "—")}</small></div>
+                  <div><strong>{Number(record.quantity) || 1} ticket{Number(record.quantity) === 1 ? "" : "s"}</strong><small>₱{(Number(record.total_amount) || 0).toLocaleString("en-PH")}</small></div>
+                  <span className={`admin-status ${paid ? "paid" : "pending"}`}><i />{paid ? "Paid" : "For confirmation"}</span>
+                  <button
+                    type="button"
+                    disabled={!record.id}
+                    onClick={() => void updateRecord(record.id, { status: paid ? "for_confirmation" : "paid" }).then(() => setSaveError("")).catch(() => setSaveError("The registration status could not be updated."))}
+                  >{paid ? "Reopen" : "Confirm paid"}</button>
+                </article>
+              );
+            }) : <EmptyState message="No registrations match your search." />}
+          </div>
+        </section>
       </section>
     </PlatformShell>
   );
@@ -316,23 +432,35 @@ function RegistrationCenter() {
 
 function ScheduleManagement() {
   const [query, setQuery] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<StoredRecord | null | undefined>(undefined);
   const [saveError, setSaveError] = useState("");
   const seededSchedules = schedules.map(([event_at, venue, status]) => ({ event_at, venue, status }));
-  const { records: items, connection, createRecord, deleteRecord } = usePlatformRecords("schedules", seededSchedules);
-  const visible = items.filter((item) => `${item.event_at ?? ""} ${item.venue ?? ""}`.toLowerCase().includes(query.toLowerCase()));
+  const { records: items, connection, createRecord, updateRecord } = usePlatformRecords("schedules", seededSchedules);
+  const visible = items.filter((item) => `${item.event_at ?? ""} ${item.venue ?? ""} ${item.city ?? ""}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => new Date(String(a.event_at)).getTime() - new Date(String(b.event_at)).getTime());
   return (
     <PlatformShell page="seminar-schedule-management">
-      <GradientBanner variant="pink" />
-      <section className="platform-content-section"><DataConnectionBadge state={connection} /><PageIntro title="Seminar Schedule Management" copy="Creating, updating, and managing Awakening seminar schedules in one place." action="New Schedule" search={query} onSearch={setQuery} onAction={() => setAdding(true)} />{saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}<div className="platform-filter-row"><button>Venue⌄</button></div><div className="schedule-manager-list">{visible.map((item, index) => <article key={String(item.id ?? `${item.event_at}-${index}`)}><time>{String(item.event_at ?? "Date pending")}</time><strong className={String(item.status ?? "purple")}>{String(item.venue ?? "Venue pending")}</strong><div><button className="platform-primary">▣ Customize</button><button onClick={() => void deleteRecord(item.id)}>↯ Cancel</button></div></article>)}</div></section>
-      {adding && <Modal title="New Schedule" onClose={() => setAdding(false)} onSave={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); const eventAt = new Date(Date.now() + 30 * 86400000).toISOString(); void createRecord({ event_at: eventAt, venue: String(data.get("name")), status: "scheduled" }).then(() => { setAdding(false); setSaveError(""); }).catch(() => setSaveError("Connect Supabase to save schedules permanently.")); }} />}
-      <button className="platform-floating-add" type="button" onClick={() => setAdding(true)} aria-label="New Schedule">＋</button>
+      <section className="admin-schedule-workspace">
+        <header className="admin-schedule-hero"><div><span className="admin-eyebrow">One source of truth</span><h1>Schedule<br /><em>manager.</em></h1><p>Create or adjust a session once. The public schedule and registration selector update automatically.</p></div><div><DataConnectionBadge state={connection} /><button className="platform-primary" type="button" onClick={() => setEditing(null)}>＋ New schedule</button></div></header>
+        <div className="admin-publish-flow"><span>Admin schedule</span><i>→</i><span>Latest Schedules</span><i>→</i><span>Secure My Slot</span></div>
+        <section className="admin-schedule-panel">
+          <header><div><span className="admin-eyebrow">Published sessions</span><h2>Upcoming schedule</h2></div><SearchBar value={query} onChange={setQuery} placeholder="Search date, city, or venue" /></header>
+          {saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}
+          <div className="admin-schedule-list">{visible.map((item, index) => {
+            const published = item.status === "scheduled";
+            return <article key={String(item.id ?? `${item.event_at}-${index}`)}><time><b>{item.event_at ? new Intl.DateTimeFormat("en-PH", { day: "2-digit", timeZone: "Asia/Manila" }).format(new Date(item.event_at)) : "—"}</b><span>{item.event_at ? new Intl.DateTimeFormat("en-PH", { month: "short", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(item.event_at)) : "Date pending"}</span></time><div><span className={`admin-status ${published ? "paid" : "pending"}`}><i />{published ? "Published" : String(item.status ?? "Draft")}</span><h3>{String(item.city || "Awakening session")}</h3><p>{String(item.venue ?? "Venue pending")}</p><small>{item.event_at ? new Intl.DateTimeFormat("en-PH", { weekday: "long", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(item.event_at)) : ""}{item.capacity ? ` · ${item.capacity} seats` : ""}</small></div><div><button type="button" onClick={() => setEditing(item)}>Edit</button><button type="button" disabled={!item.id} onClick={() => void updateRecord(item.id, { status: published ? "draft" : "scheduled" }).then(() => setSaveError("")).catch(() => setSaveError("The publishing status could not be changed."))}>{published ? "Unpublish" : "Publish"}</button></div></article>;
+          })}</div>
+        </section>
+      </section>
+      {editing !== undefined && <ScheduleModal record={editing ?? undefined} onClose={() => setEditing(undefined)} onSave={async (payload) => { if (editing?.id) await updateRecord(editing.id, payload); else await createRecord(payload); setEditing(undefined); setSaveError(""); }} />}
+      <button className="platform-floating-add" type="button" onClick={() => setEditing(null)} aria-label="New Schedule">＋</button>
     </PlatformShell>
   );
 }
 
 function PlatformSchedules() {
-  return <PlatformShell page="latest-schedules"><section className="platform-schedule-page"><header><h1>Awakening: An Emotional Reset<br />Experience</h1><p>Join us for a powerful reset that breaks old patterns and moves you<br />forward.</p></header><div>{schedules.map((item) => <article key={item[0]}><span>▣</span><div><small>Date &amp; Time</small><strong>{item[0]}</strong></div><span>⌾</span><div><small>Venue</small><strong>{item[1]}</strong></div></article>)}</div></section></PlatformShell>;
+  const seededSchedules = schedules.map(([event_at, venue, status]) => ({ event_at, venue, status }));
+  const { records, connection } = usePlatformRecords("schedules", seededSchedules);
+  return <PlatformShell page="latest-schedules"><section className="platform-schedule-page"><header><DataConnectionBadge state={connection} /><h1>Awakening: An Emotional Reset<br />Experience</h1><p>This is the same live schedule shown on the public website and registration page.</p></header><div>{records.filter((item) => item.status === "scheduled").map((item, index) => <article key={String(item.id ?? index)}><span>▣</span><div><small>Date &amp; Time</small><strong>{item.event_at ? new Intl.DateTimeFormat("en-PH", { dateStyle: "full", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date(item.event_at)) : "Date pending"}</strong></div><span>⌾</span><div><small>Venue</small><strong>{String(item.venue ?? "Venue pending")}</strong></div></article>)}</div></section></PlatformShell>;
 }
 
 function ApplicationsPage({ page }: { page: "applications-organizations" | "applications-staffing" | "applications-sponsorship" }) {

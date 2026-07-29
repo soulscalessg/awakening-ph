@@ -55,7 +55,7 @@ test("server-renders every public product route", async () => {
     ["/latest-schedules", /Awakening: An Emotional Reset Experience/],
     ["/registration", /Choose Your Experience/],
     ["/login", /Operations Platform/],
-    ["/awakening-for-organizations", /Operations Platform/],
+    ["/awakening-for-organizations", /Bring the reset/],
     ["/be-part-of-awakening", /There’s a place for you in this movement/],
   ];
 
@@ -112,4 +112,22 @@ test("protects database APIs and fails safely before Supabase is configured", as
   });
   assert.equal(registrationResponse.status, 503);
   assert.match(await registrationResponse.text(), /not configured/i);
+
+  const scheduleResponse = await render("/api/public-schedules", {
+    headers: { accept: "application/json" },
+  });
+  assert.equal(scheduleResponse.status, 503);
+
+  const organizationResponse = await render("/api/public-organization-application", {
+    method: "POST",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Test Business Owner",
+      email: "owner@example.com",
+      phone: "+63 900 000 0000",
+      business_name: "Test Organization",
+    }),
+  });
+  assert.equal(organizationResponse.status, 503);
+  assert.match(await organizationResponse.text(), /not configured/i);
 });
