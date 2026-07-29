@@ -72,19 +72,27 @@ function usePlatformRecords(resource: string, initial: StoredRecord[] = []) {
 
   useEffect(() => {
     let active = true;
-    fetch(`/api/platform-data/${resource}`, { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Data unavailable");
-        const result = (await response.json()) as { data?: StoredRecord[] };
-        if (active) {
-          setRecords(result.data ?? []);
-          setConnection("live");
-        }
-      })
-      .catch(() => {
-        if (active) setConnection("unavailable");
-      });
-    return () => { active = false; };
+    const loadRecords = () => {
+      fetch(`/api/platform-data/${resource}`, { cache: "no-store" })
+        .then(async (response) => {
+          if (!response.ok) throw new Error("Data unavailable");
+          const result = (await response.json()) as { data?: StoredRecord[] };
+          if (active) {
+            setRecords(result.data ?? []);
+            setConnection("live");
+          }
+        })
+        .catch(() => {
+          if (active) setConnection("unavailable");
+        });
+    };
+    loadRecords();
+    const refreshEvery = resource === "registrations" ? 3_000 : resource === "schedules" ? 10_000 : 0;
+    const timer = refreshEvery ? window.setInterval(loadRecords, refreshEvery) : undefined;
+    return () => {
+      active = false;
+      if (timer) window.clearInterval(timer);
+    };
   }, [resource]);
 
   async function createRecord(payload: StoredRecord) {
@@ -125,18 +133,28 @@ function usePlatformRecords(resource: string, initial: StoredRecord[] = []) {
 }
 
 function DataConnectionBadge({ state }: { state: "connecting" | "live" | "unavailable" }) {
-  const labels = { connecting: "Connecting data", live: "Supabase live", unavailable: "Database setup needed" };
+  const labels = { connecting: "Connecting to Awakening Server", live: "Awakening Server Online", unavailable: "Awakening Server Unavailable" };
   return <span className={`platform-data-state ${state}`}><i aria-hidden="true" />{labels[state]}</span>;
 }
 
 function PlatformShell({ page, children }: { page: PlatformPage; children: ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [openGroups, setOpenGroups] = useState<string[]>([]);
 
   return (
-    <div className="platform-shell">
+    <div className={`platform-shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
       <header className="platform-topbar">
-        <button className="platform-menu-button" type="button" aria-label="Toggle navigation" onClick={() => setMobileNav((open) => !open)}>☰</button>
+        <button
+          className="platform-menu-button"
+          type="button"
+          aria-label="Toggle navigation sidebar"
+          aria-pressed={sidebarCollapsed || mobileNav}
+          onClick={() => {
+            if (window.matchMedia("(max-width: 900px)").matches) setMobileNav((open) => !open);
+            else setSidebarCollapsed((collapsed) => !collapsed);
+          }}
+        ><span aria-hidden="true">{sidebarCollapsed ? "→" : "←"}</span></button>
         <Link href="/platform" className="platform-brand" aria-label="Awakening platform home"><img src="/awakening/logo-transparent-2026.png" alt="Awakening" /><span>Control Room</span></Link>
         <div className="platform-topbar-actions">
           <Link href="/" target="_blank">View public site ↗</Link>
@@ -265,6 +283,123 @@ function ScheduleModal({ record, onClose, onSave }: { record?: StoredRecord; onC
   );
 }
 
+type ExtractedSchedule = {
+  event_at: string;
+  venue: string;
+  city: string;
+  capacity: number;
+  status: string;
+};
+
+const scheduleMonths: Record<string, number> = {
+  january: 0, jan: 0, february: 1, feb: 1, march: 2, mar: 2, april: 3, apr: 3,
+  may: 4, june: 5, jun: 5, july: 6, jul: 6, august: 7, aug: 7, september: 8,
+  sep: 8, sept: 8, october: 9, oct: 9, november: 10, nov: 10, december: 11, dec: 11,
+};
+
+const philippineCities = ["Manila", "Pasig", "Cebu", "Davao", "Baguio", "Pampanga", "Laguna", "Marikina", "Quezon", "Rizal", "Olongapo", "General Santos", "Makati", "Taguig", "Mandaluyong", "Cavite", "Batangas", "Iloilo", "Bacolod"];
+
+function toLocalDateTimeValue(date: Date) {
+  const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return shifted.toISOString().slice(0, 16);
+}
+
+function parseScheduleSource(source: string): ExtractedSchedule[] {
+  const cleaned = source.replace(/\r/g, "\n").replace(/[•●▪◦]/g, "\n").replace(/\n{2,}/g, "\n");
+  const monthPattern = /(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*,?\s*)?(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?/gi;
+  const matches = [...cleaned.matchAll(monthPattern)];
+  if (!matches.length) return [];
+
+  return matches.map((match, index) => {
+    const start = match.index ?? 0;
+    const end = matches[index + 1]?.index ?? cleaned.length;
+    const segment = cleaned.slice(start, end).trim();
+    const month = scheduleMonths[match[1].toLowerCase()];
+    const day = Number(match[2]);
+    const year = Number(match[3]) || new Date().getFullYear();
+    const time = segment.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+    let hour = time ? Number(time[1]) : 9;
+    const minute = time?.[2] ? Number(time[2]) : 0;
+    if (time?.[3]?.toLowerCase() === "pm" && hour < 12) hour += 12;
+    if (time?.[3]?.toLowerCase() === "am" && hour === 12) hour = 0;
+
+    const explicitVenue = segment.match(/(?:venue|location|where)\s*[:—-]\s*([^\n]+)/i)?.[1]?.trim();
+    const residual = segment
+      .replace(match[0], " ")
+      .replace(time?.[0] ?? "", " ")
+      .replace(/\b(?:venue|location|where|date|time)\s*[:—-]?/gi, " ")
+      .replace(/\b(?:at|on)\b/gi, " ")
+      .replace(/\b\d+\s*(?:seats?|pax|participants?)\b/gi, " ")
+      .split(/\n|\s+[|—–-]\s+/)
+      .map((part) => part.replace(/^[,:;\s]+|[,:;\s]+$/g, "").trim())
+      .filter((part) => part.length > 2 && !/^(am|pm)$/i.test(part));
+    const venue = explicitVenue || residual[0] || "Venue to be confirmed";
+    const city = philippineCities.find((place) => `${segment} ${venue}`.toLowerCase().includes(place.toLowerCase())) || "";
+    const capacity = Number(segment.match(/\b(\d+)\s*(?:seats?|pax|participants?)\b/i)?.[1] ?? 0);
+    return {
+      event_at: toLocalDateTimeValue(new Date(year, month, day, hour, minute)),
+      venue,
+      city,
+      capacity,
+      status: "scheduled",
+    };
+  });
+}
+
+function ScheduleExtractor({ onClose, onImport }: { onClose: () => void; onImport: (records: ExtractedSchedule[]) => Promise<void> }) {
+  const [source, setSource] = useState("");
+  const [records, setRecords] = useState<ExtractedSchedule[]>([]);
+  const [readingImage, setReadingImage] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  function extract(text = source) {
+    const parsed = parseScheduleSource(text);
+    setRecords(parsed);
+    setError(parsed.length ? "" : "No dates were found. Include a month, day, venue, and optional time on each schedule.");
+  }
+
+  async function readImage(file?: File) {
+    if (!file) return;
+    setReadingImage(true);
+    setError("");
+    try {
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng");
+      const result = await worker.recognize(file);
+      await worker.terminate();
+      const text = result.data.text.trim();
+      setSource(text);
+      extract(text);
+    } catch {
+      setError("The image could not be read. Try a clearer image or paste the schedule text below.");
+    } finally {
+      setReadingImage(false);
+    }
+  }
+
+  function updateRecord(index: number, patch: Partial<ExtractedSchedule>) {
+    setRecords((current) => current.map((record, recordIndex) => recordIndex === index ? { ...record, ...patch } : record));
+  }
+
+  return (
+    <div className="platform-modal-backdrop schedule-extractor-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="schedule-extractor" role="dialog" aria-modal="true" aria-labelledby="schedule-extractor-title" onMouseDown={(event) => event.stopPropagation()}>
+        <header><div><span className="admin-eyebrow">Smart schedule entry</span><h2 id="schedule-extractor-title">Extract dates automatically.</h2><p>Upload a schedule image or paste a paragraph. Review the result before publishing.</p></div><button type="button" aria-label="Close" onClick={onClose}>×</button></header>
+        <div className="schedule-extractor-inputs">
+          <label className="schedule-image-drop"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void readImage(event.target.files?.[0])} /><span>{readingImage ? "Reading image…" : "Upload schedule image"}</span><small>PNG, JPG, or WEBP · processed privately in your browser</small></label>
+          <div className="schedule-extractor-divider"><span>or paste text</span></div>
+          <label>Schedule paragraph<textarea value={source} onChange={(event) => setSource(event.target.value)} placeholder={"August 15, 2026 at 9:00 AM — House of Transformation, Pasig\nSeptember 19, 2026 at 9:00 AM — Cebu City · 120 seats"} /></label>
+          <button className="platform-primary" type="button" disabled={!source.trim() || readingImage} onClick={() => extract()}>Extract schedules</button>
+        </div>
+        {error && <div className="platform-inline-error" role="alert">{error}</div>}
+        {records.length > 0 && <div className="schedule-extractor-results"><header><div><span className="admin-eyebrow">Ready to review</span><h3>{records.length} schedule{records.length === 1 ? "" : "s"} found</h3></div><span>Edit anything before publishing</span></header>{records.map((record, index) => <article key={`${record.event_at}-${index}`}><span className="schedule-result-number">{String(index + 1).padStart(2, "0")}</span><label>Date and time<input type="datetime-local" value={record.event_at} onChange={(event) => updateRecord(index, { event_at: event.target.value })} /></label><label>Venue<input value={record.venue} onChange={(event) => updateRecord(index, { venue: event.target.value })} /></label><label>City<input value={record.city} onChange={(event) => updateRecord(index, { city: event.target.value })} /></label><label>Seats<input type="number" min="0" value={record.capacity || ""} onChange={(event) => updateRecord(index, { capacity: Number(event.target.value) || 0 })} /></label><button type="button" aria-label={`Remove schedule ${index + 1}`} onClick={() => setRecords((current) => current.filter((_, recordIndex) => recordIndex !== index))}>×</button></article>)}</div>}
+        <footer><button type="button" onClick={onClose}>Cancel</button><button className="platform-primary" type="button" disabled={!records.length || saving} onClick={() => { setSaving(true); setError(""); void onImport(records).catch(() => setError("One or more schedules could not be published. Check for duplicate dates and venues.")).finally(() => setSaving(false)); }}>{saving ? "Publishing…" : `Publish ${records.length || ""} schedule${records.length === 1 ? "" : "s"}`}</button></footer>
+      </section>
+    </div>
+  );
+}
+
 function SystemInformation() {
   return (
     <PlatformShell page="system-information">
@@ -281,15 +416,29 @@ function SystemInformation() {
 }
 
 function AccountSettings() {
-  const [name, setName] = useState("SoulScale Systems");
+  const [name, setName] = useState("Awakening Operations");
   const [saved, setSaved] = useState(false);
   return (
     <PlatformShell page="account">
-      <GradientBanner variant="pink"><span className="platform-large-avatar">SS</span></GradientBanner>
-      <section className="account-panel">
-        <header><h1>Account settings</h1><p>Manage your account</p></header>
-        <article><label>Email<strong>soulscalesystems@gmail.com</strong></label><label>Password<strong>••••••••••••</strong></label><label>Name*<input value={name} onChange={(event) => setName(event.target.value)} /></label></article>
-        <button className="platform-primary" type="button" onClick={() => { setSaved(true); window.setTimeout(() => setSaved(false), 1800); }}>{saved ? "Updated" : "Update"}</button>
+      <section className="account-workspace">
+        <header className="account-hero">
+          <div><span className="admin-eyebrow">Secure administration</span><h1>Account<br /><em>settings.</em></h1><p>Manage the identity used inside the Awakening control room.</p></div>
+          <span className="account-security-mark" aria-hidden="true">AN</span>
+        </header>
+        <div className="account-layout">
+          <aside className="account-profile-card">
+            <span className="account-profile-avatar">AN</span>
+            <div><small>Signed in as</small><strong>{name}</strong><p>Administrator · Awakening Philippines</p></div>
+            <span className="account-online"><i />Awakening Server Online</span>
+          </aside>
+          <article className="account-settings-card">
+            <header><div><span className="admin-eyebrow">Profile details</span><h2>Your admin identity</h2></div><span>Protected account</span></header>
+            <label>Display name<input value={name} onChange={(event) => setName(event.target.value)} /></label>
+            <label>Account email<input value="soulscalesystems@gmail.com" readOnly aria-readonly="true" /></label>
+            <div className="account-security-row"><div><small>Password</small><strong>••••••••••••</strong></div><span>Managed securely</span></div>
+            <footer><p>{saved ? "Your account display name is updated." : "Changes affect how your name appears in this control room."}</p><button className="platform-primary" type="button" onClick={() => { setSaved(true); window.setTimeout(() => setSaved(false), 2200); }}>{saved ? "Changes saved" : "Save changes"}</button></footer>
+          </article>
+        </div>
       </section>
     </PlatformShell>
   );
@@ -318,7 +467,7 @@ function ResourcePage({ page }: { page: "contacts" | "document-hub" | "photo-lib
         {saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}
         {filtered.length ? <div className="platform-record-grid">{filtered.map((record) => <article key={record.id ?? String(record.name)}><span>SS</span><div><b>{String(record.name ?? "Untitled")}</b><small>{record.email ? String(record.email) : "Saved to workspace"}</small></div><button type="button" aria-label={`Delete ${String(record.name ?? "record")}`} onClick={() => void deleteRecord(record.id)}>×</button></article>)}</div> : <EmptyState message={page === "contacts" ? "No results found, try adjusting your search and filters." : undefined} />}
       </section>
-      {modal && <Modal title={config[2]} onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); const name = String(data.get("name")); const contactFields = page === "contacts" ? { email: String(data.get("email")), phone: String(data.get("phone")) } : {}; void createRecord({ name, ...contactFields }).then(() => { setModal(false); setSaveError(""); }).catch(() => setSaveError("Connect Supabase to save records permanently.")); }} />}
+      {modal && <Modal title={config[2]} onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); const name = String(data.get("name")); const contactFields = page === "contacts" ? { email: String(data.get("email")), phone: String(data.get("phone")) } : {}; void createRecord({ name, ...contactFields }).then(() => { setModal(false); setSaveError(""); }).catch(() => setSaveError("Awakening Server could not save this record.")); }} />}
       <button className="platform-floating-add" type="button" onClick={() => setModal(true)} aria-label={config[2]}>＋</button>
     </PlatformShell>
   );
@@ -358,7 +507,7 @@ function CRM() {
         <div className="platform-metrics four"><MetricCard label="Closed Deals (This Month)" value="0" /><MetricCard label="Revenue Closed (This Month)" value="₱0.00" /><MetricCard label="Total Leads (This Week)" value="0" /><MetricCard label="Pipeline Value" value="₱0.00" /></div>
         <div className="platform-split"><div><DataConnectionBadge state={connection} /><PageIntro title="Customer Relationship Management" copy="Track, manage, and strengthen every client interaction." action="New Lead" search={query} onSearch={setQuery} onAction={() => setModal(true)} />{saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}<div className="platform-filter-row"><button>Assigned To⌄</button><button>Lead Source⌄</button><button>Status / Stage⌄</button></div>{visibleLeads.length ? <div className="platform-record-grid">{visibleLeads.map((lead) => <article key={lead.id ?? String(lead.name)}><span>SS</span><div><b>{String(lead.name ?? "Untitled lead")}</b><small>{String(lead.email ?? "New lead")}</small></div></article>)}</div> : <EmptyState message="No results found, try adjusting your search and filters." />}</div><aside><h2>Quick Menu</h2><QuickLinks items={["Registration Center", "Sales & Revenue", "Seminar Schedule Management"]} /></aside></div>
       </section>
-      {modal && <Modal title="New Lead" onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); void createRecord({ name: String(data.get("name")), email: String(data.get("email")), phone: String(data.get("phone")) }).then(() => { setModal(false); setSaveError(""); }).catch(() => setSaveError("Connect Supabase to save leads permanently.")); }} />}
+      {modal && <Modal title="New Lead" onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); void createRecord({ name: String(data.get("name")), email: String(data.get("email")), phone: String(data.get("phone")) }).then(() => { setModal(false); setSaveError(""); }).catch(() => setSaveError("Awakening Server could not save this lead.")); }} />}
       <button className="platform-floating-add" type="button" onClick={() => setModal(true)} aria-label="New Lead">＋</button>
     </PlatformShell>
   );
@@ -372,7 +521,7 @@ function RegistrationCenter() {
   const filtered = records.filter((record) => `${record.name ?? ""} ${record.email ?? ""} ${record.code ?? ""}`.toLowerCase().includes(query.toLowerCase()));
   const tickets = records.reduce((sum, record) => sum + (Number(record.quantity) || 1), 0);
   const revenue = records.reduce((sum, record) => sum + (Number(record.total_amount) || 0), 0);
-  const pending = records.filter((record) => record.status !== "paid").length;
+  const pending = records.filter((record) => record.status === "for_confirmation" || record.status === "For Confirmation").length;
 
   function exportRegistrations() {
     const header = ["Code", "Name", "Email", "Phone", "Schedule", "Quantity", "Amount", "Status"];
@@ -393,7 +542,7 @@ function RegistrationCenter() {
           <div className="admin-control-actions"><DataConnectionBadge state={connection} /><Link href="/platform/seminar-schedule-management" className="platform-primary">Manage schedules ↗</Link></div>
         </header>
 
-        <div className="admin-live-strip"><span><i />Live from Supabase</span><p>{pending ? `${pending} payment${pending === 1 ? "" : "s"} waiting for confirmation` : "All payments reviewed"}</p><time>{new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date())}</time></div>
+        <div className="admin-live-strip"><span><i />Awakening Server Online</span><p>{pending ? `${pending} payment${pending === 1 ? "" : "s"} waiting for confirmation` : "All payments reviewed"}</p><time>Live updates every 3 seconds</time></div>
 
         <div className="admin-metric-grid">
           <article><span>Total registrations</span><strong>{records.length}</strong><small>People in the database</small></article>
@@ -409,17 +558,18 @@ function RegistrationCenter() {
             <div className="admin-table-head"><span>Attendee</span><span>Schedule</span><span>Booking</span><span>Status</span><span>Action</span></div>
             {filtered.length ? filtered.map((record) => {
               const paid = record.status === "paid" || record.status === "Paid";
+              const rejected = record.status === "rejected" || record.status === "Rejected";
               return (
                 <article key={String(record.id ?? record.code)}>
                   <div className="admin-attendee"><b>{String(record.name ?? "Registrant").slice(0, 1)}</b><span><strong>{String(record.name ?? "Registrant")}</strong><a href={`mailto:${String(record.email ?? "")}`}>{String(record.email ?? "—")}</a><small>{String(record.code ?? "NEW")}</small></span></div>
                   <div><strong>{String(record.event_date ?? "Date pending")}</strong><small>{String(record.phone ?? "—")}</small></div>
                   <div><strong>{Number(record.quantity) || 1} ticket{Number(record.quantity) === 1 ? "" : "s"}</strong><small>₱{(Number(record.total_amount) || 0).toLocaleString("en-PH")}</small></div>
-                  <span className={`admin-status ${paid ? "paid" : "pending"}`}><i />{paid ? "Paid" : "For confirmation"}</span>
+                  <span className={`admin-status ${paid ? "paid" : rejected ? "rejected" : "pending"}`}><i />{paid ? "Paid" : rejected ? "Rejected" : "For confirmation"}</span>
                   <button
                     type="button"
                     disabled={!record.id}
-                    onClick={() => void updateRecord(record.id, { status: paid ? "for_confirmation" : "paid" }).then(() => setSaveError("")).catch(() => setSaveError("The registration status could not be updated."))}
-                  >{paid ? "Reopen" : "Confirm paid"}</button>
+                    onClick={() => void updateRecord(record.id, { status: rejected ? "for_confirmation" : paid ? "for_confirmation" : "paid" }).then(() => setSaveError("")).catch(() => setSaveError("The registration status could not be updated."))}
+                  >{rejected ? "Move to review" : paid ? "Reopen" : "Confirm paid"}</button>
                 </article>
               );
             }) : <EmptyState message="No registrations match your search." />}
@@ -433,6 +583,7 @@ function RegistrationCenter() {
 function ScheduleManagement() {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<StoredRecord | null | undefined>(undefined);
+  const [extractorOpen, setExtractorOpen] = useState(false);
   const [saveError, setSaveError] = useState("");
   const seededSchedules = schedules.map(([event_at, venue, status]) => ({ event_at, venue, status }));
   const { records: items, connection, createRecord, updateRecord } = usePlatformRecords("schedules", seededSchedules);
@@ -440,7 +591,7 @@ function ScheduleManagement() {
   return (
     <PlatformShell page="seminar-schedule-management">
       <section className="admin-schedule-workspace">
-        <header className="admin-schedule-hero"><div><span className="admin-eyebrow">One source of truth</span><h1>Schedule<br /><em>manager.</em></h1><p>Create or adjust a session once. The public schedule and registration selector update automatically.</p></div><div><DataConnectionBadge state={connection} /><button className="platform-primary" type="button" onClick={() => setEditing(null)}>＋ New schedule</button></div></header>
+        <header className="admin-schedule-hero"><div><span className="admin-eyebrow">One source of truth</span><h1>Schedule<br /><em>manager.</em></h1><p>Create or adjust a session once. The public schedule and registration selector update automatically.</p></div><div><DataConnectionBadge state={connection} /><button className="platform-secondary-dark" type="button" onClick={() => setExtractorOpen(true)}>✦ Extract dates</button><button className="platform-primary" type="button" onClick={() => setEditing(null)}>＋ New schedule</button></div></header>
         <div className="admin-publish-flow"><span>Admin schedule</span><i>→</i><span>Latest Schedules</span><i>→</i><span>Secure My Slot</span></div>
         <section className="admin-schedule-panel">
           <header><div><span className="admin-eyebrow">Published sessions</span><h2>Upcoming schedule</h2></div><SearchBar value={query} onChange={setQuery} placeholder="Search date, city, or venue" /></header>
@@ -452,6 +603,7 @@ function ScheduleManagement() {
         </section>
       </section>
       {editing !== undefined && <ScheduleModal record={editing ?? undefined} onClose={() => setEditing(undefined)} onSave={async (payload) => { if (editing?.id) await updateRecord(editing.id, payload); else await createRecord(payload); setEditing(undefined); setSaveError(""); }} />}
+      {extractorOpen && <ScheduleExtractor onClose={() => setExtractorOpen(false)} onImport={async (extracted) => { for (const item of extracted) await createRecord({ ...item, event_at: new Date(item.event_at).toISOString() }); setExtractorOpen(false); setSaveError(""); }} />}
       <button className="platform-floating-add" type="button" onClick={() => setEditing(null)} aria-label="New Schedule">＋</button>
     </PlatformShell>
   );
@@ -476,7 +628,7 @@ function ApplicationsPage({ page }: { page: "applications-organizations" | "appl
   const { records, connection, createRecord } = usePlatformRecords(resource);
   const visible = records.filter((record) => String(record.name ?? "").toLowerCase().includes(query.toLowerCase()));
   return (
-    <PlatformShell page={page}><GradientBanner variant="rainbow" /><section className="platform-content-section"><DataConnectionBadge state={connection} /><PageIntro title={data[0]} copy={data[1]} action={data[2]} search={query} onSearch={setQuery} onAction={() => setModal(true)} />{saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}<div className="application-table"><header>{data[3].map((column) => <span key={column}>{column}</span>)}</header>{visible.length ? visible.map((record) => <div key={String(record.id ?? record.name)}><strong>{String(record.name ?? "Applicant")}</strong><span>{String(record.email ?? "—")}</span><span>{String(record.phone ?? "—")}</span></div>) : <EmptyState />}</div></section>{modal && <Modal title={data[2]} onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const formData = new FormData(event.currentTarget); void createRecord({ name: String(formData.get("name")), email: String(formData.get("email")), phone: String(formData.get("phone")) }).then(() => { setModal(false); setSaveError(""); }).catch(() => setSaveError("Connect Supabase to save applications permanently.")); }} />}<button className="platform-floating-add" type="button" onClick={() => setModal(true)} aria-label={data[2]}>＋</button></PlatformShell>
+    <PlatformShell page={page}><GradientBanner variant="rainbow" /><section className="platform-content-section"><DataConnectionBadge state={connection} /><PageIntro title={data[0]} copy={data[1]} action={data[2]} search={query} onSearch={setQuery} onAction={() => setModal(true)} />{saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}<div className="application-table"><header>{data[3].map((column) => <span key={column}>{column}</span>)}</header>{visible.length ? visible.map((record) => <div key={String(record.id ?? record.name)}><strong>{String(record.name ?? "Applicant")}</strong><span>{String(record.email ?? "—")}</span><span>{String(record.phone ?? "—")}</span></div>) : <EmptyState />}</div></section>{modal && <Modal title={data[2]} onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const formData = new FormData(event.currentTarget); void createRecord({ name: String(formData.get("name")), email: String(formData.get("email")), phone: String(formData.get("phone")) }).then(() => { setModal(false); setSaveError(""); }).catch(() => setSaveError("Awakening Server could not save this application.")); }} />}<button className="platform-floating-add" type="button" onClick={() => setModal(true)} aria-label={data[2]}>＋</button></PlatformShell>
   );
 }
 

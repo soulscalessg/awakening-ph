@@ -97,14 +97,14 @@ function Shell({
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className={`site-shell ${initialLoading ? "is-initial-loading" : ""}`}>
+    <div className={`site-shell ${initialLoading ? "is-initial-loading" : ""} ${menuOpen ? "sidebar-toggle-active" : ""}`}>
       <AmbientLights />
       <header className="topbar">
         <button
           className="mobile-menu"
           type="button"
           aria-label="Toggle sidebar"
-          aria-expanded={menuOpen}
+          aria-pressed={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
         >
           <span className="sr-only">Toggle sidebar</span>
