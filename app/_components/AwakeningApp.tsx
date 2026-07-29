@@ -187,6 +187,13 @@ function HomePage() {
   ];
   const [activeSlide, setActiveSlide] = useState(4);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [introVisible, setIntroVisible] = useState(true);
+  const [countdown, setCountdown] = useState({
+    days: "00",
+    hours: "00",
+    minutes: "00",
+    seconds: "00",
+  });
 
   useEffect(() => {
     const timer = window.setInterval(
@@ -197,14 +204,112 @@ function HomePage() {
   }, [carouselImages.length]);
 
   useEffect(() => {
-    const revealTimer = window.setTimeout(() => setInitialLoadComplete(true), 350);
-    return () => window.clearTimeout(revealTimer);
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const root = document.documentElement;
+
+    if (!reducedMotion) root.classList.add("awakening-intro-lock");
+
+    const contentTimer = window.setTimeout(
+      () => setInitialLoadComplete(true),
+      reducedMotion ? 0 : 650,
+    );
+    const introTimer = window.setTimeout(
+      () => {
+        setIntroVisible(false);
+        root.classList.remove("awakening-intro-lock");
+      },
+      reducedMotion ? 80 : 2450,
+    );
+
+    return () => {
+      window.clearTimeout(contentTimer);
+      window.clearTimeout(introTimer);
+      root.classList.remove("awakening-intro-lock");
+    };
+  }, []);
+
+  useEffect(() => {
+    const revealElements = document.querySelectorAll<HTMLElement>(
+      ".home-2026 [data-home-reveal]",
+    );
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reducedMotion || !("IntersectionObserver" in window)) {
+      revealElements.forEach((element) => element.classList.add("is-visible"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { rootMargin: "0px 0px -10%", threshold: 0.12 },
+    );
+
+    revealElements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const nextSession = new Date("2026-08-15T09:00:00+08:00").getTime();
+    const updateCountdown = () => {
+      const remaining = Math.max(0, nextSession - Date.now());
+      const days = Math.floor(remaining / 86_400_000);
+      const hours = Math.floor((remaining / 3_600_000) % 24);
+      const minutes = Math.floor((remaining / 60_000) % 60);
+      const seconds = Math.floor((remaining / 1_000) % 60);
+      setCountdown({
+        days: String(days).padStart(2, "0"),
+        hours: String(hours).padStart(2, "0"),
+        minutes: String(minutes).padStart(2, "0"),
+        seconds: String(seconds).padStart(2, "0"),
+      });
+    };
+
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const filmLoading = !initialLoadComplete;
 
   return (
-    <Shell active="home" initialLoading={!initialLoadComplete}>
+    <div className="home-2026">
+      {introVisible && (
+        <div className="home-intro" role="status" aria-label="Awakening is opening">
+          <div className="home-intro-orbit" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="home-intro-copy">
+            <span className="home-intro-kicker">A guided moment to</span>
+            <img
+              src="/awakening/logo-hero.png"
+              alt="Awakening — The Emotional Reset Experience"
+            />
+            <p>Breathe in. Let go. Begin again.</p>
+          </div>
+          <div className="home-intro-line" aria-hidden="true"><span /></div>
+          <button
+            className="home-intro-skip"
+            type="button"
+            onClick={() => {
+              setIntroVisible(false);
+              setInitialLoadComplete(true);
+              document.documentElement.classList.remove("awakening-intro-lock");
+            }}
+          >
+            Skip intro
+          </button>
+        </div>
+      )}
+      <Shell active="home" initialLoading={!initialLoadComplete}>
       <section className="source-hero">
         <video
           className="source-hero-video"
@@ -216,6 +321,10 @@ function HomePage() {
           aria-hidden="true"
         />
         <div className="source-hero-shade" />
+        <div className="home-hero-aura" aria-hidden="true"><span /></div>
+        <div className="home-hero-meta" aria-hidden="true">
+          <span>Philippines</span><span>Emotional reset · 2026</span>
+        </div>
         <div className="source-hero-inner">
           <Link className="eyebrow-link" href="/latest-schedules">
             <b>NEW</b> See our next schedules →
@@ -238,9 +347,12 @@ function HomePage() {
             </Link>
           </div>
         </div>
+        <a className="home-scroll-cue" href="#experience">
+          <span aria-hidden="true" /> Explore the experience
+        </a>
       </section>
 
-      <section className="source-film">
+      <section className="source-film" id="experience" data-home-reveal>
         <video
           src="https://assets.softr-files.com/applications/997cb2bf-c7eb-4897-a6f9-3ffa4629c279/assets/2273d90c-8e51-4248-8f81-f81c9f164e5c.mp4"
           autoPlay
@@ -256,7 +368,7 @@ function HomePage() {
         )}
       </section>
 
-      <section className="source-partners">
+      <section className="source-partners" data-home-reveal>
         <p>COMMUNITY PARTNERS</p>
         <div className="source-partner-row" aria-label="Community partners">
           <div className="source-partner-track">
@@ -267,26 +379,51 @@ function HomePage() {
         </div>
       </section>
 
-      <section className="source-countdown">
+      <section className="source-countdown" data-home-reveal>
         <div className="source-countdown-shade" />
         <div className="source-countdown-content">
+          <span className="home-section-kicker">Your next reset begins in</span>
           <h1>Next Schedule</h1>
           <div className="source-countdown-grid" aria-label="Countdown">
-            <div><strong>00</strong><span>DAYS</span></div>
-            <div><strong>00</strong><span>HOURS</span></div>
-            <div><strong>00</strong><span>MINUTES</span></div>
-            <div><strong>00</strong><span>SECONDS</span></div>
+            <div><strong>{countdown.days}</strong><span>DAYS</span></div>
+            <div><strong>{countdown.hours}</strong><span>HOURS</span></div>
+            <div><strong>{countdown.minutes}</strong><span>MINUTES</span></div>
+            <div><strong>{countdown.seconds}</strong><span>SECONDS</span></div>
+          </div>
+          <p>August 15 · House of Transformation, Pasig</p>
+          <Link className="home-text-link" href="/registration">Reserve this date <span>↗</span></Link>
+        </div>
+      </section>
+
+      <section className="source-carousel" aria-label="Awakening experience gallery" data-home-reveal>
+        <div className="home-section-heading">
+          <span className="home-section-kicker">Inside the experience</span>
+          <h2>Real people. Real release.<br /><em>A room that moves with you.</em></h2>
+        </div>
+        <div className="source-carousel-frame">
+          <img key={carouselImages[activeSlide]} src={carouselImages[activeSlide]} alt="Awakening experience" />
+          <div className="home-gallery-index">0{activeSlide + 1} <span>/ 0{carouselImages.length}</span></div>
+          <div className="home-gallery-controls">
+            <button type="button" aria-label="Previous photo" onClick={() => setActiveSlide((slide) => (slide - 1 + carouselImages.length) % carouselImages.length)}>←</button>
+            <button type="button" aria-label="Next photo" onClick={() => setActiveSlide((slide) => (slide + 1) % carouselImages.length)}>→</button>
           </div>
         </div>
-      </section>
-
-      <section className="source-carousel" aria-label="Awakening experience gallery">
-        <div className="source-carousel-frame">
-          <img src={carouselImages[activeSlide]} alt="Awakening experience" />
+        <div className="source-carousel-dots" aria-label="Choose gallery image">
+          {carouselImages.map((image, index) => (
+            <button
+              type="button"
+              className={activeSlide === index ? "active" : ""}
+              aria-label={`Show photo ${index + 1}`}
+              aria-current={activeSlide === index ? "true" : undefined}
+              onClick={() => setActiveSlide(index)}
+              key={image}
+            />
+          ))}
         </div>
       </section>
 
-      <section className="source-programs">
+      <section className="source-programs" data-home-reveal>
+        <span className="home-section-kicker">A growing ecosystem</span>
         <h2>Programs We Are Connected To</h2>
         <div className="program-grid">
           <article>
@@ -301,13 +438,14 @@ function HomePage() {
         </div>
       </section>
 
-      <section className="source-video-grid" aria-label="Awakening community videos">
+      <section className="source-video-grid" aria-label="Awakening community videos" data-home-reveal>
         {communityVideos.map((src) => (
           <video src={src} autoPlay muted loop playsInline key={src} />
         ))}
       </section>
 
-      <section className="source-act-now">
+      <section className="source-act-now" data-home-reveal>
+        <span className="home-section-kicker">This is your moment</span>
         <h2>You already know if you need this.</h2>
         <p>The only question is: Are you going to act now?</p>
         <Link href="/registration">
@@ -315,7 +453,8 @@ function HomePage() {
         </Link>
       </section>
 
-      <section className="source-tickets">
+      <section className="source-tickets" data-home-reveal>
+        <span className="home-section-kicker">One day. A different direction.</span>
         <h2>Get Tickets To Next Session</h2>
         <div className="ticket-card">
           <div className="price">
@@ -334,7 +473,7 @@ function HomePage() {
         </div>
       </section>
 
-      <section className="source-organization">
+      <section className="source-organization" data-home-reveal>
         <div className="source-organization-card">
           <div className="source-organization-copy">
           <h2>Bring Awakening To Your Organization</h2>
@@ -355,7 +494,7 @@ function HomePage() {
         </div>
       </section>
 
-      <section className="source-join">
+      <section className="source-join" data-home-reveal>
         <h2>How Do You Want To Be Part Of Awakening?</h2>
         <p>
           Whether you want to serve, partner, support, or bring this to your team
@@ -367,7 +506,8 @@ function HomePage() {
       </section>
 
       <Footer />
-    </Shell>
+      </Shell>
+    </div>
   );
 }
 
