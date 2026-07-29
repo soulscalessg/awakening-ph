@@ -3,6 +3,18 @@
   "name": "awakening-ph-platform",
   "main": "dist/server/index.js",
   "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "soulpreneur.ph",
+      "custom_domain": true,
+      "zone_name": "soulpreneur.ph"
+    },
+    {
+      "pattern": "www.soulpreneur.ph",
+      "custom_domain": true,
+      "zone_name": "soulpreneur.ph"
+    }
+  ],
   "compatibility_date": "2026-07-29",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
