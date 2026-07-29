@@ -3,7 +3,7 @@ import test from "node:test";
 
 const applicationRoot = new URL("../", import.meta.url);
 
-async function render(pathname = "/") {
+async function render(pathname = "/", init = {}) {
   const workerUrl = new URL("dist/server/index.js", applicationRoot);
   workerUrl.searchParams.set(
     "test",
@@ -13,7 +13,8 @@ async function render(pathname = "/") {
 
   return worker.fetch(
     new Request(new URL(pathname, "http://localhost"), {
-      headers: { accept: "text/html" },
+      headers: { accept: "text/html", ...init.headers },
+      ...init,
     }),
     {
       ASSETS: {
@@ -91,4 +92,24 @@ test("protects the operations platform behind the admin login", async () => {
   assert.match(login, /Operations Platform/);
   assert.match(login, /Authorized access only/);
   assert.match(login, /Enter your username/);
+});
+
+test("protects database APIs and fails safely before Supabase is configured", async () => {
+  const protectedResponse = await render("/api/platform-data/contacts", {
+    headers: { accept: "application/json" },
+  });
+  assert.equal(protectedResponse.status, 401);
+
+  const registrationResponse = await render("/api/public-registration", {
+    method: "POST",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Test Registrant",
+      email: "test@example.com",
+      phone: "+63 900 000 0000",
+      event_date: "August 15 - Manila",
+    }),
+  });
+  assert.equal(registrationResponse.status, 503);
+  assert.match(await registrationResponse.text(), /not configured/i);
 });

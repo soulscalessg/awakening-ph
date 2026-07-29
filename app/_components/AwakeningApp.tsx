@@ -462,6 +462,7 @@ function RegistrationPage() {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const total = useMemo(() => 1499 * quantity, [quantity]);
 
@@ -471,13 +472,40 @@ function RegistrationPage() {
     setStep(nextStep);
   }
 
-  function confirmRegistration() {
+  async function confirmRegistration() {
     if (!referenceNumber.trim() || !proofFile) {
       setError("Please complete all payment fields");
       return;
     }
     setError("");
-    setSubmitted(true);
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/public-registration", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name,
+          email,
+          phone,
+          event_date: schedule,
+          quantity,
+          total_amount: total,
+          payment_method: method,
+          payment_reference: referenceNumber,
+          payment_proof_name: proofFile.name,
+        }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setError(result.error ?? "Unable to submit your registration.");
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setError("Unable to submit right now. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -656,7 +684,7 @@ function RegistrationPage() {
                   {error && <div className="source-error" role="alert">{error}</div>}
                   <div className="source-form-actions">
                     <button type="button" className="source-secondary-button" onClick={() => advanceTo(3)}>Back</button>
-                    <button type="button" className="source-primary-button" onClick={confirmRegistration}>Confirm Registration</button>
+                    <button type="button" className="source-primary-button" disabled={submitting} onClick={() => void confirmRegistration()}>{submitting ? "Saving Registration…" : "Confirm Registration"}</button>
                   </div>
                   <p className="source-verification-note">Your slot will be confirmed after payment verification</p>
                 </div>

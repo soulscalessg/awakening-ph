@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, ReactNode, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useState } from "react";
 
 type PlatformPage =
   | "system-information"
@@ -41,6 +41,69 @@ const navSections = [
   { label: "Latest Schedules", icon: "▢", href: "/platform/latest-schedules", pages: ["latest-schedules"] },
   { label: "Applications", icon: "◧", pages: ["applications-organizations", "applications-staffing", "applications-sponsorship"], children: [["For Organizations", "/platform/applications/organizations", "applications-organizations"], ["For Staffing Team", "/platform/applications/staffing", "applications-staffing"], ["For Sponsorship", "/platform/applications/sponsorship", "applications-sponsorship"]] },
 ] as const;
+
+type StoredRecord = {
+  id?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  venue?: string;
+  event_at?: string;
+  event_date?: string;
+  code?: string;
+  status?: string;
+  created_at?: string;
+  [key: string]: unknown;
+};
+
+function usePlatformRecords(resource: string, initial: StoredRecord[] = []) {
+  const [records, setRecords] = useState<StoredRecord[]>(initial);
+  const [connection, setConnection] = useState<"connecting" | "live" | "unavailable">("connecting");
+
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/platform-data/${resource}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Data unavailable");
+        const result = (await response.json()) as { data?: StoredRecord[] };
+        if (active) {
+          setRecords(result.data ?? []);
+          setConnection("live");
+        }
+      })
+      .catch(() => {
+        if (active) setConnection("unavailable");
+      });
+    return () => { active = false; };
+  }, [resource]);
+
+  async function createRecord(payload: StoredRecord) {
+    const response = await fetch(`/api/platform-data/${resource}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error("Unable to save this record.");
+    const result = (await response.json()) as { data: StoredRecord };
+    setRecords((current) => [result.data, ...current]);
+    setConnection("live");
+    return result.data;
+  }
+
+  async function deleteRecord(id?: string) {
+    if (!id) return;
+    const response = await fetch(`/api/platform-data/${resource}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!response.ok) throw new Error("Unable to delete this record.");
+    setRecords((current) => current.filter((record) => record.id !== id));
+  }
+
+  return { records, connection, createRecord, deleteRecord };
+}
+
+function DataConnectionBadge({ state }: { state: "connecting" | "live" | "unavailable" }) {
+  const labels = { connecting: "Connecting data", live: "Supabase live", unavailable: "Database setup needed" };
+  return <span className={`platform-data-state ${state}`}><i aria-hidden="true" />{labels[state]}</span>;
+}
 
 function PlatformShell({ page, children }: { page: PlatformPage; children: ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
@@ -165,23 +228,27 @@ function AccountSettings() {
 function ResourcePage({ page }: { page: "contacts" | "document-hub" | "photo-library" }) {
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState(false);
-  const [records, setRecords] = useState<string[]>([]);
+  const [saveError, setSaveError] = useState("");
   const config = {
     contacts: ["Contact Library", "Central database of all partners and contacts for tracking and follow-up.", "New Contact"],
     "document-hub": ["Document Hub", "Centralized storage for all project, client, and operational documents.", "Add New File"],
     "photo-library": ["Photo Library", "Fresh day ahead — let's make it count", "Create New Gallery"],
   }[page];
-  const filtered = records.filter((record) => record.toLowerCase().includes(query.toLowerCase()));
+  const resource = { contacts: "contacts", "document-hub": "documents", "photo-library": "galleries" }[page];
+  const { records, connection, createRecord, deleteRecord } = usePlatformRecords(resource);
+  const filtered = records.filter((record) => String(record.name ?? "").toLowerCase().includes(query.toLowerCase()));
   return (
     <PlatformShell page={page}>
       <GradientBanner variant={page === "photo-library" ? "rainbow" : "blue"} />
       {page === "photo-library" && <div className="platform-greeting"><span>☀</span><div><h1>Good morning, SoulScale</h1><p>{config[1]}</p></div></div>}
       <section className="platform-content-section">
         {page === "document-hub" && <QuickLinks items={["Contacts", "Photo Library", "Seminar Schedule Management"]} />}
+        <DataConnectionBadge state={connection} />
         <PageIntro title={config[0]} copy={page === "photo-library" ? undefined : config[1]} action={config[2]} search={query} onSearch={setQuery} onAction={() => setModal(true)} />
-        {filtered.length ? <div className="platform-record-grid">{filtered.map((record) => <article key={record}><span>SS</span><div><b>{record}</b><small>Added just now</small></div><button type="button">•••</button></article>)}</div> : <EmptyState message={page === "contacts" ? "No results found, try adjusting your search and filters." : undefined} />}
+        {saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}
+        {filtered.length ? <div className="platform-record-grid">{filtered.map((record) => <article key={record.id ?? String(record.name)}><span>SS</span><div><b>{String(record.name ?? "Untitled")}</b><small>{record.email ? String(record.email) : "Saved to workspace"}</small></div><button type="button" aria-label={`Delete ${String(record.name ?? "record")}`} onClick={() => void deleteRecord(record.id)}>×</button></article>)}</div> : <EmptyState message={page === "contacts" ? "No results found, try adjusting your search and filters." : undefined} />}
       </section>
-      {modal && <Modal title={config[2]} onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); setRecords((current) => [...current, String(data.get("name"))]); setModal(false); }} />}
+      {modal && <Modal title={config[2]} onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); const name = String(data.get("name")); const contactFields = page === "contacts" ? { email: String(data.get("email")), phone: String(data.get("phone")) } : {}; void createRecord({ name, ...contactFields }).then(() => { setModal(false); setSaveError(""); }).catch(() => setSaveError("Connect Supabase to save records permanently.")); }} />}
       <button className="platform-floating-add" type="button" onClick={() => setModal(true)} aria-label={config[2]}>＋</button>
     </PlatformShell>
   );
@@ -207,8 +274,10 @@ function SalesRevenue() {
 
 function CRM() {
   const [query, setQuery] = useState("");
-  const [leads, setLeads] = useState<string[]>([]);
   const [modal, setModal] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const { records: leads, connection, createRecord } = usePlatformRecords("leads");
+  const visibleLeads = leads.filter((lead) => String(lead.name ?? "").toLowerCase().includes(query.toLowerCase()));
   return (
     <PlatformShell page="crm">
       <GradientBanner><div className="platform-banner-greeting"><div><h1>Great to see you, SoulScale</h1><p>Everything you need, all in one place</p></div><SearchBar value={query} onChange={setQuery} placeholder="Search..." /></div></GradientBanner>
@@ -217,9 +286,9 @@ function CRM() {
         <div className="platform-chart-grid two"><article><h2>Lead Stage Overview</h2><div className="platform-donut muted"><span>No data</span></div></article><article><h2>Total Leads</h2><div className="platform-no-data">No data</div></article></div>
         <div className="platform-tabs"><button className="is-active" type="button">☼ Overview</button></div>
         <div className="platform-metrics four"><MetricCard label="Closed Deals (This Month)" value="0" /><MetricCard label="Revenue Closed (This Month)" value="₱0.00" /><MetricCard label="Total Leads (This Week)" value="0" /><MetricCard label="Pipeline Value" value="₱0.00" /></div>
-        <div className="platform-split"><div><PageIntro title="Customer Relationship Management" copy="Track, manage, and strengthen every client interaction." action="New Lead" search={query} onSearch={setQuery} onAction={() => setModal(true)} /><div className="platform-filter-row"><button>Assigned To⌄</button><button>Lead Source⌄</button><button>Status / Stage⌄</button></div>{leads.length ? <div className="platform-record-grid">{leads.map((lead) => <article key={lead}><span>SS</span><b>{lead}</b></article>)}</div> : <EmptyState message="No results found, try adjusting your search and filters." />}</div><aside><h2>Quick Menu</h2><QuickLinks items={["Registration Center", "Sales & Revenue", "Seminar Schedule Management"]} /></aside></div>
+        <div className="platform-split"><div><DataConnectionBadge state={connection} /><PageIntro title="Customer Relationship Management" copy="Track, manage, and strengthen every client interaction." action="New Lead" search={query} onSearch={setQuery} onAction={() => setModal(true)} />{saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}<div className="platform-filter-row"><button>Assigned To⌄</button><button>Lead Source⌄</button><button>Status / Stage⌄</button></div>{visibleLeads.length ? <div className="platform-record-grid">{visibleLeads.map((lead) => <article key={lead.id ?? String(lead.name)}><span>SS</span><div><b>{String(lead.name ?? "Untitled lead")}</b><small>{String(lead.email ?? "New lead")}</small></div></article>)}</div> : <EmptyState message="No results found, try adjusting your search and filters." />}</div><aside><h2>Quick Menu</h2><QuickLinks items={["Registration Center", "Sales & Revenue", "Seminar Schedule Management"]} /></aside></div>
       </section>
-      {modal && <Modal title="New Lead" onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); setLeads((current) => [...current, String(data.get("name"))]); setModal(false); }} />}
+      {modal && <Modal title="New Lead" onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); void createRecord({ name: String(data.get("name")), email: String(data.get("email")), phone: String(data.get("phone")) }).then(() => { setModal(false); setSaveError(""); }).catch(() => setSaveError("Connect Supabase to save leads permanently.")); }} />}
       <button className="platform-floating-add" type="button" onClick={() => setModal(true)} aria-label="New Lead">＋</button>
     </PlatformShell>
   );
@@ -228,31 +297,35 @@ function CRM() {
 function RegistrationCenter() {
   const [tab, setTab] = useState<"insights" | "menu">("insights");
   const [query, setQuery] = useState("");
-  const filtered = registrants.filter((record) => `${record.name} ${record.email} ${record.code}`.toLowerCase().includes(query.toLowerCase()));
+  const seededRegistrants = registrants.map((record) => ({ ...record, event_date: record.date, status: record.status === "Paid" ? "paid" : "for_confirmation" }));
+  const { records, connection } = usePlatformRecords("registrations", seededRegistrants);
+  const filtered = records.filter((record) => `${record.name ?? ""} ${record.email ?? ""} ${record.code ?? ""}`.toLowerCase().includes(query.toLowerCase()));
   return (
     <PlatformShell page="registration-center">
       <GradientBanner />
       <section className="platform-dashboard registration-dashboard">
-        <header className="registration-title"><h1>REGISTRATION CENTER</h1><p>Your complete view of every attendee.</p></header>
+        <header className="registration-title"><div><h1>REGISTRATION CENTER</h1><p>Your complete view of every attendee.</p></div><DataConnectionBadge state={connection} /></header>
         <div className="platform-tabs"><button className={tab === "insights" ? "is-active" : ""} onClick={() => setTab("insights")} type="button">☼ Insights</button><button className={tab === "menu" ? "is-active" : ""} onClick={() => setTab("menu")} type="button">↗ Quick Menu</button></div>
         {tab === "insights" ? <div className="platform-metrics three"><MetricCard label="Total Tickets Sold" value="424" /><MetricCard label="Ticket Sales This Month" value="PHP 181,379.00" /><MetricCard label="Total Gross Profit" value="PHP 635,576.00" /><MetricCard label="Payments for Confirmation" value="2" /><MetricCard label="No. of Registrants This Month" value="71" /><MetricCard label="Total No. of Registrants" value="262" /></div> : <QuickLinks items={["Seminar Schedule Management", "Awakening For Organizations Applications", "Sponsorship Applications", "Staffing Applications"]} />}
         <GradientBanner><div className="platform-banner-greeting"><span>SS</span><div><small>Great to see you, SoulScale</small><h1>Pick up right where you left off</h1></div><SearchBar value={query} onChange={setQuery} placeholder="Search..." /></div></GradientBanner>
-        <div className="registration-manager"><div><PageIntro title="REGISTRATION MANAGER" copy="View and manage all event registrants." search={query} onSearch={setQuery} /><div className="platform-filter-row"><button>Confirmation Status⌄</button><button>Date Attending⌄</button><button className="platform-primary">⇩ Export</button></div><div className="registrant-list">{filtered.map((record) => <article key={record.code}><span className="receipt-thumb">RECEIPT</span><div><b>{record.code}</b><em>{record.date}</em><strong>{record.name}</strong><a href={`mailto:${record.email}`}>✉ {record.email}</a><a href={`tel:${record.phone}`}>▯ {record.phone}</a><small className={record.status === "Paid" ? "paid" : "pending"}>{record.status}</small></div><div><button className="platform-primary" type="button">✎ Edit</button><button type="button">Change Status</button></div></article>)}</div></div><aside className="platform-calendar"><header><b>Jul 2026</b><div><button>Today</button><button>‹</button><button>›</button></div></header><div className="calendar-grid">{"SMTWTFS".split("").map((day, index) => <b key={`${day}-${index}`}>{day}</b>)}{Array.from({ length: 35 }, (_, index) => <span className={index === 31 ? "today" : ""} key={index}>{index < 3 ? 28 + index : index - 2}</span>)}</div></aside></div>
+        <div className="registration-manager"><div><PageIntro title="REGISTRATION MANAGER" copy="View and manage all event registrants." search={query} onSearch={setQuery} /><div className="platform-filter-row"><button>Confirmation Status⌄</button><button>Date Attending⌄</button><button className="platform-primary">⇩ Export</button></div><div className="registrant-list">{filtered.map((record) => { const paid = record.status === "paid" || record.status === "Paid"; return <article key={String(record.id ?? record.code)}><span className="receipt-thumb">RECEIPT</span><div><b>{String(record.code ?? "NEW")}</b><em>{String(record.event_date ?? "Date pending")}</em><strong>{String(record.name ?? "Registrant")}</strong><a href={`mailto:${String(record.email ?? "")}`}>✉ {String(record.email ?? "—")}</a><a href={`tel:${String(record.phone ?? "")}`}>▯ {String(record.phone ?? "—")}</a><small className={paid ? "paid" : "pending"}>{paid ? "Paid" : "For Confirmation"}</small></div><div><button className="platform-primary" type="button">✎ Edit</button><button type="button">Change Status</button></div></article>; })}</div></div><aside className="platform-calendar"><header><b>Jul 2026</b><div><button>Today</button><button>‹</button><button>›</button></div></header><div className="calendar-grid">{"SMTWTFS".split("").map((day, index) => <b key={`${day}-${index}`}>{day}</b>)}{Array.from({ length: 35 }, (_, index) => <span className={index === 31 ? "today" : ""} key={index}>{index < 3 ? 28 + index : index - 2}</span>)}</div></aside></div>
       </section>
     </PlatformShell>
   );
 }
 
 function ScheduleManagement() {
-  const [items, setItems] = useState(schedules.map((item) => [...item] as string[]));
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
-  const visible = items.filter((item) => item.join(" ").toLowerCase().includes(query.toLowerCase()));
+  const [saveError, setSaveError] = useState("");
+  const seededSchedules = schedules.map(([event_at, venue, status]) => ({ event_at, venue, status }));
+  const { records: items, connection, createRecord, deleteRecord } = usePlatformRecords("schedules", seededSchedules);
+  const visible = items.filter((item) => `${item.event_at ?? ""} ${item.venue ?? ""}`.toLowerCase().includes(query.toLowerCase()));
   return (
     <PlatformShell page="seminar-schedule-management">
       <GradientBanner variant="pink" />
-      <section className="platform-content-section"><PageIntro title="Seminar Schedule Management" copy="Creating, updating, and managing Awakening seminar schedules in one place." action="New Schedule" search={query} onSearch={setQuery} onAction={() => setAdding(true)} /><div className="platform-filter-row"><button>Venue⌄</button></div><div className="schedule-manager-list">{visible.map((item, index) => <article key={`${item[0]}-${index}`}><time>{item[0]}</time><strong className={item[2]}>{item[1]}</strong><div><button className="platform-primary">▣ Customize</button><button onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>↯ Cancel</button></div></article>)}</div></section>
-      {adding && <Modal title="New Schedule" onClose={() => setAdding(false)} onSave={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); setItems((current) => [...current, ["New date · 9:00 AM", String(data.get("name")), "purple"]]); setAdding(false); }} />}
+      <section className="platform-content-section"><DataConnectionBadge state={connection} /><PageIntro title="Seminar Schedule Management" copy="Creating, updating, and managing Awakening seminar schedules in one place." action="New Schedule" search={query} onSearch={setQuery} onAction={() => setAdding(true)} />{saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}<div className="platform-filter-row"><button>Venue⌄</button></div><div className="schedule-manager-list">{visible.map((item, index) => <article key={String(item.id ?? `${item.event_at}-${index}`)}><time>{String(item.event_at ?? "Date pending")}</time><strong className={String(item.status ?? "purple")}>{String(item.venue ?? "Venue pending")}</strong><div><button className="platform-primary">▣ Customize</button><button onClick={() => void deleteRecord(item.id)}>↯ Cancel</button></div></article>)}</div></section>
+      {adding && <Modal title="New Schedule" onClose={() => setAdding(false)} onSave={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); const eventAt = new Date(Date.now() + 30 * 86400000).toISOString(); void createRecord({ event_at: eventAt, venue: String(data.get("name")), status: "scheduled" }).then(() => { setAdding(false); setSaveError(""); }).catch(() => setSaveError("Connect Supabase to save schedules permanently.")); }} />}
       <button className="platform-floating-add" type="button" onClick={() => setAdding(true)} aria-label="New Schedule">＋</button>
     </PlatformShell>
   );
@@ -264,16 +337,18 @@ function PlatformSchedules() {
 
 function ApplicationsPage({ page }: { page: "applications-organizations" | "applications-staffing" | "applications-sponsorship" }) {
   const [query, setQuery] = useState("");
-  const [records, setRecords] = useState<string[]>([]);
   const [modal, setModal] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const data = {
     "applications-organizations": ["Awakening for Organizations Applications", "Database for organizations interested in bringing Awakening to their team.", "New Applicant", ["How did you find…", "Owner/CEO Name", "Email address", "Contact number", "Business Name", "Industry", "How many employees do you have?"]],
     "applications-staffing": ["Staffing Team Applicants", "Internal database for Awakening staff applicants.", "Add record", ["Name", "Facebook link", "Email address", "Contact number"]],
     "applications-sponsorship": ["Sponsorship Applications", "", "New Applicant", ["How did you find…", "Owner/CEO Name", "Email address", "Contact number", "Business Name", "Industry", "What are your products"]],
   }[page] as [string, string, string, string[]];
-  const visible = records.filter((record) => record.toLowerCase().includes(query.toLowerCase()));
+  const resource = { "applications-organizations": "organization-applications", "applications-staffing": "staffing-applications", "applications-sponsorship": "sponsorship-applications" }[page];
+  const { records, connection, createRecord } = usePlatformRecords(resource);
+  const visible = records.filter((record) => String(record.name ?? "").toLowerCase().includes(query.toLowerCase()));
   return (
-    <PlatformShell page={page}><GradientBanner variant="rainbow" /><section className="platform-content-section"><PageIntro title={data[0]} copy={data[1]} action={data[2]} search={query} onSearch={setQuery} onAction={() => setModal(true)} /><div className="application-table"><header>{data[3].map((column) => <span key={column}>{column}</span>)}</header>{visible.length ? visible.map((record) => <div key={record}><strong>{record}</strong><span>—</span><span>—</span></div>) : <EmptyState />}</div></section>{modal && <Modal title={data[2]} onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const formData = new FormData(event.currentTarget); setRecords((current) => [...current, String(formData.get("name"))]); setModal(false); }} />}<button className="platform-floating-add" type="button" onClick={() => setModal(true)} aria-label={data[2]}>＋</button></PlatformShell>
+    <PlatformShell page={page}><GradientBanner variant="rainbow" /><section className="platform-content-section"><DataConnectionBadge state={connection} /><PageIntro title={data[0]} copy={data[1]} action={data[2]} search={query} onSearch={setQuery} onAction={() => setModal(true)} />{saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}<div className="application-table"><header>{data[3].map((column) => <span key={column}>{column}</span>)}</header>{visible.length ? visible.map((record) => <div key={String(record.id ?? record.name)}><strong>{String(record.name ?? "Applicant")}</strong><span>{String(record.email ?? "—")}</span><span>{String(record.phone ?? "—")}</span></div>) : <EmptyState />}</div></section>{modal && <Modal title={data[2]} onClose={() => setModal(false)} onSave={(event) => { event.preventDefault(); const formData = new FormData(event.currentTarget); void createRecord({ name: String(formData.get("name")), email: String(formData.get("email")), phone: String(formData.get("phone")) }).then(() => { setModal(false); setSaveError(""); }).catch(() => setSaveError("Connect Supabase to save applications permanently.")); }} />}<button className="platform-floating-add" type="button" onClick={() => setModal(true)} aria-label={data[2]}>＋</button></PlatformShell>
   );
 }
 
