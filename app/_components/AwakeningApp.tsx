@@ -32,9 +32,15 @@ type PublicSchedule = {
 
 const fallbackSchedules: PublicSchedule[] = [
   { id: "aug-15-manila", event_at: "2026-08-15T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
+  { id: "aug-22-olongapo", event_at: "2026-08-22T09:00:00+08:00", venue: "Olongapo", city: "Olongapo", status: "scheduled" },
+  { id: "sep-05-pampanga", event_at: "2026-09-05T09:00:00+08:00", venue: "Pampanga", city: "Pampanga", status: "scheduled" },
+  { id: "sep-12-rizal", event_at: "2026-09-12T09:00:00+08:00", venue: "Rizal", city: "Rizal", status: "scheduled" },
   { id: "sep-19-manila", event_at: "2026-09-19T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
   { id: "oct-10-manila", event_at: "2026-10-10T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
+  { id: "oct-17-laguna", event_at: "2026-10-17T09:00:00+08:00", venue: "Laguna", city: "Laguna", status: "scheduled" },
+  { id: "nov-07-marikina", event_at: "2026-11-07T09:00:00+08:00", venue: "Marikina", city: "Marikina", status: "scheduled" },
   { id: "nov-21-manila", event_at: "2026-11-21T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
+  { id: "nov-28-quezon", event_at: "2026-11-28T09:00:00+08:00", venue: "Quezon", city: "Quezon", status: "scheduled" },
   { id: "dec-05-manila", event_at: "2026-12-05T09:00:00+08:00", venue: "House of Transformation, Ayala the 30th, Pasig", city: "Manila", status: "scheduled" },
 ];
 
@@ -154,13 +160,26 @@ function Footer() {
   return (
     <footer className="footer">
       <div className="footer-inner">
-        <div className="footer-brand">
-          <img src="/awakening/logo-transparent-2026.png" alt="Awakening" />
-          <p>Philippines as a FIRST-WORLD country.</p>
+        <section className="footer-invitation">
+          <span>YOUR NEXT CHAPTER</span>
+          <h2>One honest day can change your direction.</h2>
+          <Link href="/registration">Reserve your place <b aria-hidden="true">↗</b></Link>
+        </section>
+        <div className="footer-lower">
+          <div className="footer-brand">
+            <img src="/awakening/logo-transparent-2026.png" alt="Awakening" />
+            <p>Pause. Feel. Begin again.</p>
+          </div>
+          <nav className="footer-navigation" aria-label="Footer navigation">
+            <Link href="/latest-schedules">Latest schedules</Link>
+            <Link href="/registration">Secure my slot</Link>
+            <Link href="/awakening-for-organizations">For organizations</Link>
+          </nav>
+          <ul className="socials" aria-label="Social media">
+            <li><a href="https://www.facebook.com/search/top?q=Awakened%20Nation" target="_blank" rel="noreferrer" aria-label="Awakened Nation on Facebook"><FacebookIcon /><span>Awakened Nation</span></a></li>
+          </ul>
         </div>
-        <ul className="socials" aria-label="Social media">
-          <li><a href="https://www.facebook.com/search/top?q=Awakened%20Nation" target="_blank" rel="noreferrer" aria-label="Awakened Nation on Facebook"><FacebookIcon /></a></li>
-        </ul>
+        <div className="footer-signoff"><span>Awakening Philippines</span><span>THE EMOTIONAL RESET EXPERIENCE · 2026</span></div>
       </div>
     </footer>
   );
@@ -628,6 +647,22 @@ function RegistrationPage() {
     setStep(nextStep);
   }
 
+  function buyAnotherTicket() {
+    setStep(1);
+    setSchedule("");
+    setScheduleOpen(false);
+    setQuantity(1);
+    setName("");
+    setEmail("");
+    setPhone("");
+    setMethod("");
+    setReferenceNumber("");
+    setProofFile(null);
+    setError("");
+    setSubmitted(false);
+    window.scrollTo({ top: 500, behavior: "smooth" });
+  }
+
   async function confirmRegistration() {
     if (!referenceNumber.trim() || !proofFile) {
       setError("Please complete all payment fields");
@@ -857,6 +892,7 @@ function RegistrationPage() {
                     <div><span>Contact</span><strong>{phone}</strong></div>
                     <div><span>Event Date</span><strong>{schedule}</strong></div>
                     <div><span>Quantity</span><strong>{quantity} ticket(s)</strong></div>
+                    <div><span>Payment method</span><strong>{method === "gcash" ? "GCash" : "Bank transfer"}</strong></div>
                     <div className="source-summary-total"><span>Total Amount</span><strong>PHP {total.toFixed(2)}</strong></div>
                   </div>
                 </div>
@@ -887,10 +923,17 @@ function RegistrationPage() {
           {submitted && (
             <article className="source-form-card source-success-card">
               <div className="source-form-inner">
-                <div className="source-success-icon" aria-hidden="true">✓</div>
-                <h2>Registration Submitted!</h2>
-                <p>Your registration has been received successfully.</p>
-                <p>Please wait for confirmation. We&apos;ll review your payment and confirm your slot.</p>
+                <div className="source-success-celebration" aria-hidden="true"><i /><i /><i /><i /><span><b>✓</b></span></div>
+                <span className="source-success-kicker">Your place is being prepared</span>
+                <h2>Beautiful choice.</h2>
+                <p className="source-success-lead">Your registration is safely with the Awakening team.</p>
+                <div className="source-success-receipt">
+                  <div><span>Experience</span><strong>{schedule}</strong></div>
+                  <div><span>Guests</span><strong>{quantity} {quantity === 1 ? "ticket" : "tickets"}</strong></div>
+                  <div><span>Payment</span><strong>{method === "gcash" ? "GCash" : "Bank transfer"} · For review</strong></div>
+                </div>
+                <p className="source-success-note">We&apos;ll review your payment proof and confirm your place. Keep an eye on your inbox.</p>
+                <button type="button" className="source-primary-button source-buy-another" onClick={buyAnotherTicket}>Buy another ticket <span aria-hidden="true">↗</span></button>
               </div>
             </article>
           )}

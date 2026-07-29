@@ -6,7 +6,6 @@ const pageMap: Record<string, PlatformPage> = {
   "system-information": "system-information",
   contacts: "contacts",
   "document-hub": "document-hub",
-  "photo-library": "photo-library",
   "sales-revenue": "sales-revenue",
   crm: "crm",
   "registration-center": "registration-center",
