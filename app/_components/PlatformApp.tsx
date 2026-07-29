@@ -64,6 +64,7 @@ type StoredRecord = {
   employee_count?: number;
   payment_method?: string;
   payment_reference?: string;
+  payment_proof_name?: string;
   organization?: string;
   source?: string;
   stage?: string;
@@ -494,19 +495,20 @@ function LineChart({ color = "#3b82f6", fill = false }: { color?: string; fill?:
 
 function SalesRevenue() {
   const { records, connection } = usePlatformRecords("registrations");
-  const paid = records.filter((record) => String(record.status).toLowerCase() === "paid");
+  const activeRecords = records.filter((record) => !isArchivedRegistration(record));
+  const paid = activeRecords.filter((record) => String(record.status).toLowerCase() === "paid");
   const paidRevenue = paid.reduce((sum, record) => sum + (Number(record.total_amount) || 0), 0);
-  const tickets = records.reduce((sum, record) => sum + (Number(record.quantity) || 1), 0);
+  const tickets = activeRecords.reduce((sum, record) => sum + (Number(record.quantity) || 1), 0);
   const month = new Date().getMonth();
-  const monthRecords = records.filter((record) => record.created_at && new Date(record.created_at).getMonth() === month);
-  const paymentGroups = ["gcash", "bank"].map((method) => ({ method, count: records.filter((record) => record.payment_method === method).length }));
-  const locationTotals = Array.from(records.reduce((map, record) => { const place = String(record.event_date ?? "Date pending").split("·").at(-1)?.trim() || "Date pending"; map.set(place, (map.get(place) ?? 0) + (Number(record.total_amount) || 0)); return map; }, new Map<string, number>()).entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const monthRecords = activeRecords.filter((record) => record.created_at && new Date(record.created_at).getMonth() === month);
+  const paymentGroups = ["gcash", "bank"].map((method) => ({ method, count: activeRecords.filter((record) => record.payment_method === method).length }));
+  const locationTotals = Array.from(activeRecords.reduce((map, record) => { const place = String(record.event_date ?? "Date pending").split("·").at(-1)?.trim() || "Date pending"; map.set(place, (map.get(place) ?? 0) + (Number(record.total_amount) || 0)); return map; }, new Map<string, number>()).entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
   return (
     <PlatformShell page="sales-revenue">
       <section className="ops-data-page">
         <header className="ops-data-hero"><div><span className="admin-eyebrow">Live registration intelligence</span><h1>Profit &amp; Sales Manager</h1><p>Real figures calculated directly from the registration center.</p></div><DataConnectionBadge state={connection} /></header>
         <div className="platform-metrics four"><MetricCard label="Tickets reserved" value={tickets.toLocaleString("en-PH")} /><MetricCard label="Registrations this month" value={String(monthRecords.length)} /><MetricCard label="Confirmed revenue" value={`₱${paidRevenue.toLocaleString("en-PH")}`} /><MetricCard label="Payments confirmed" value={String(paid.length)} /></div>
-        <div className="ops-insight-grid"><article><header><span>Payment mix</span><strong>{records.length} registrations</strong></header>{paymentGroups.map((group) => <div className="ops-stat-row" key={group.method}><span>{group.method === "gcash" ? "GCash" : "Bank transfer"}</span><div><i style={{ width: `${records.length ? (group.count / records.length) * 100 : 0}%` }} /></div><b>{group.count}</b></div>)}</article><article><header><span>Bookings by schedule</span><strong>Submitted value</strong></header>{locationTotals.length ? locationTotals.map(([location, amount]) => <div className="ops-location-row" key={location}><span>{location}</span><b>₱{amount.toLocaleString("en-PH")}</b></div>) : <EmptyState message="Registration data will appear here." />}</article></div>
+        <div className="ops-insight-grid"><article><header><span>Payment mix</span><strong>{activeRecords.length} active registrations</strong></header>{paymentGroups.map((group) => <div className="ops-stat-row" key={group.method}><span>{group.method === "gcash" ? "GCash" : "Bank transfer"}</span><div><i style={{ width: `${activeRecords.length ? (group.count / activeRecords.length) * 100 : 0}%` }} /></div><b>{group.count}</b></div>)}</article><article><header><span>Bookings by schedule</span><strong>Submitted value</strong></header>{locationTotals.length ? locationTotals.map(([location, amount]) => <div className="ops-location-row" key={location}><span>{location}</span><b>₱{amount.toLocaleString("en-PH")}</b></div>) : <EmptyState message="Registration data will appear here." />}</article></div>
       </section>
     </PlatformShell>
   );
@@ -545,26 +547,44 @@ function RegistrationReviewModal({ record, dates, onClose, onSave }: { record: S
   const [status, setStatus] = useState(String(record.status ?? "for_confirmation").toLowerCase().replaceAll(" ", "_"));
   const [saving, setSaving] = useState(false);
   const save = (nextStatus = status) => { setSaving(true); void onSave({ event_date: attendanceDate, payment_method: paymentMethod, status: nextStatus }).finally(() => setSaving(false)); };
-  return <div className="platform-modal-backdrop" role="presentation" onMouseDown={onClose}><section className="platform-modal ops-modal registration-review-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><header><div><span className="admin-eyebrow">Registration review</span><h2>{String(record.name ?? "Registrant")}</h2><p>{String(record.code ?? "NEW")} · {Number(record.quantity) || 1} ticket{Number(record.quantity) === 1 ? "" : "s"}</p></div><button type="button" onClick={onClose} aria-label="Close">×</button></header><div className="registration-review-facts"><div><span>Email</span><strong>{String(record.email ?? "—")}</strong></div><div><span>Reference</span><strong>{String(record.payment_reference ?? "Not provided")}</strong></div><div><span>Amount</span><strong>₱{(Number(record.total_amount) || 0).toLocaleString("en-PH")}</strong></div></div><label>Attendance date <small>Per request only</small><select value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)}>{!dates.includes(attendanceDate) && <option value={attendanceDate}>{attendanceDate}</option>}{dates.map((date) => <option value={date} key={date}>{date}</option>)}</select></label><div className="ops-modal-grid"><label>Payment method<select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}><option value="">Not selected</option><option value="gcash">GCash</option><option value="bank">Bank transfer</option></select></label><label>Payment status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="for_confirmation">For confirmation</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select></label></div><footer className="registration-review-actions"><button type="button" className="danger" disabled={saving} onClick={() => save("rejected")}>Reject payment</button><button type="button" disabled={saving} onClick={() => save()}>Save changes</button><button type="button" className="platform-primary" disabled={saving} onClick={() => save("paid")}>Confirm payment</button></footer></section></div>;
+  const proof = (() => { try { const parsed = JSON.parse(String(record.payment_proof_name ?? "")) as { name?: string; data?: string }; return parsed.data?.startsWith("data:image/") ? parsed : null; } catch { return null; } })();
+  return <div className="platform-modal-backdrop" role="presentation" onMouseDown={onClose}><section className="platform-modal ops-modal registration-review-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><header><div><span className="admin-eyebrow">Registration review</span><h2>{String(record.name ?? "Registrant")}</h2><p>{String(record.code ?? "NEW")} · {Number(record.quantity) || 1} ticket{Number(record.quantity) === 1 ? "" : "s"}</p></div><button type="button" onClick={onClose} aria-label="Close">×</button></header><div className="registration-review-facts"><div><span>Email</span><strong>{String(record.email ?? "—")}</strong></div><div><span>Reference</span><strong>{String(record.payment_reference ?? "Not provided")}</strong></div><div><span>Amount</span><strong>₱{(Number(record.total_amount) || 0).toLocaleString("en-PH")}</strong></div></div>{proof?.data ? <a className="registration-proof-link" href={proof.data} target="_blank" rel="noreferrer">View payment proof · {proof.name || "Image"} ↗</a> : <p className="registration-proof-legacy">Payment proof on older records is stored as: {String(record.payment_proof_name ?? "Not provided")}</p>}<label>Attendance date <small>Per request only</small><select value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)}>{!dates.includes(attendanceDate) && <option value={attendanceDate}>{attendanceDate}</option>}{dates.map((date) => <option value={date} key={date}>{date}</option>)}</select></label><div className="ops-modal-grid"><label>Payment method<select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}><option value="">Not selected</option><option value="gcash">GCash</option><option value="bank">Bank transfer</option></select></label><label>Payment status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="for_confirmation">For confirmation</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select></label></div><footer className="registration-review-actions"><button type="button" className="danger" disabled={saving} onClick={() => save("rejected")}>Reject payment</button><button type="button" disabled={saving} onClick={() => save()}>Save changes</button><button type="button" className="platform-primary" disabled={saving} onClick={() => save("paid")}>Confirm payment</button></footer></section></div>;
+}
+
+function isArchivedRegistration(record: StoredRecord) {
+  return String(record.status ?? "").toLowerCase().startsWith("archived_");
+}
+
+function archiveRegistrationStatus(record: StoredRecord) {
+  const current = String(record.status ?? "for_confirmation").toLowerCase().replaceAll(" ", "_");
+  return `archived_${current.replace(/^archived_/, "")}`;
+}
+
+function restoreRegistrationStatus(record: StoredRecord) {
+  return String(record.status ?? "archived_for_confirmation").toLowerCase().replace(/^archived_/, "") || "for_confirmation";
 }
 
 function RegistrationCenter() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  const [archiveView, setArchiveView] = useState(false);
   const [reviewing, setReviewing] = useState<StoredRecord | null>(null);
   const [saveError, setSaveError] = useState("");
   const seededRegistrants = registrants.map((record) => ({ ...record, event_date: record.date, status: record.status === "Paid" ? "paid" : "for_confirmation" }));
   const { records, connection, updateRecord } = usePlatformRecords("registrations", seededRegistrants);
-  const dates = Array.from(new Set(records.map((record) => String(record.event_date ?? "")).filter(Boolean))).sort();
-  const filtered = records.filter((record) => `${record.name ?? ""} ${record.email ?? ""} ${record.code ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (statusFilter === "all" || String(record.status ?? "for_confirmation").toLowerCase().replaceAll(" ", "_") === statusFilter) && (dateFilter === "all" || String(record.event_date) === dateFilter));
-  const tickets = records.reduce((sum, record) => sum + (Number(record.quantity) || 1), 0);
-  const revenue = records.reduce((sum, record) => sum + (Number(record.total_amount) || 0), 0);
-  const pending = records.filter((record) => record.status === "for_confirmation" || record.status === "For Confirmation").length;
+  const activeRecords = records.filter((record) => !isArchivedRegistration(record));
+  const archivedRecords = records.filter(isArchivedRegistration);
+  const viewRecords = archiveView ? archivedRecords : activeRecords;
+  const dates = Array.from(new Set(activeRecords.map((record) => String(record.event_date ?? "")).filter(Boolean))).sort();
+  const filtered = viewRecords.filter((record) => `${record.name ?? ""} ${record.email ?? ""} ${record.code ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (archiveView || statusFilter === "all" || String(record.status ?? "for_confirmation").toLowerCase().replaceAll(" ", "_") === statusFilter) && (dateFilter === "all" || String(record.event_date) === dateFilter));
+  const tickets = activeRecords.reduce((sum, record) => sum + (Number(record.quantity) || 1), 0);
+  const revenue = activeRecords.reduce((sum, record) => sum + (Number(record.total_amount) || 0), 0);
+  const pending = activeRecords.filter((record) => record.status === "for_confirmation" || record.status === "For Confirmation").length;
 
   function exportRegistrations() {
     const header = ["Code", "Name", "Email", "Phone", "Schedule", "Quantity", "Amount", "Payment Method", "Payment Reference", "Status"];
-    const rows = records.map((record) => [record.code, record.name, record.email, record.phone, record.event_date, record.quantity, record.total_amount, record.payment_method, record.payment_reference, record.status]);
+    const rows = filtered.map((record) => [record.code, record.name, record.email, record.phone, record.event_date, record.quantity, record.total_amount, record.payment_method, record.payment_reference, record.status]);
     const csv = [header, ...rows].map((row) => row.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
     const link = document.createElement("a");
     link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -584,7 +604,7 @@ function RegistrationCenter() {
         <div className="admin-live-strip"><span><i />Awakening Server Online</span><p>{pending ? `${pending} payment${pending === 1 ? "" : "s"} waiting for confirmation` : "All payments reviewed"}</p><time>Live updates every 3 seconds</time></div>
 
         <div className="admin-metric-grid">
-          <article><span>Total registrations</span><strong>{records.length}</strong><small>People in the database</small></article>
+          <article><span>Active registrations</span><strong>{activeRecords.length}</strong><small>Archived records excluded</small></article>
           <article><span>Tickets reserved</span><strong>{tickets}</strong><small>Across all schedules</small></article>
           <article><span>Gross bookings</span><strong>₱{revenue.toLocaleString("en-PH")}</strong><small>Submitted registration value</small></article>
           <article className={pending ? "needs-attention" : ""}><span>For confirmation</span><strong>{pending}</strong><small>{pending ? "Needs your attention" : "Nothing pending"}</small></article>
@@ -592,11 +612,13 @@ function RegistrationCenter() {
 
         <section className="admin-registration-panel">
           <header><div><span className="admin-eyebrow">Attendee database</span><h2>Registrations</h2><p>Filter attendees, review payments, or move an attendance date when requested.</p></div><div><SearchBar value={query} onChange={setQuery} placeholder="Search name, email, or code" /><button type="button" onClick={exportRegistrations}>Export CSV</button></div></header>
-          <div className="admin-registration-filters"><label>Status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="for_confirmation">For confirmation</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select></label><label>Attendance date<select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}><option value="all">All dates</option>{dates.map((date) => <option value={date} key={date}>{date}</option>)}</select></label><button type="button" onClick={() => { setQuery(""); setStatusFilter("all"); setDateFilter("all"); }}>Reset filters</button><span>{filtered.length} result{filtered.length === 1 ? "" : "s"}</span></div>
+          <div className="admin-registration-views" role="tablist" aria-label="Registration views"><button type="button" role="tab" aria-selected={!archiveView} className={!archiveView ? "is-active" : ""} onClick={() => setArchiveView(false)}>Active <span>{activeRecords.length}</span></button><button type="button" role="tab" aria-selected={archiveView} className={archiveView ? "is-active" : ""} onClick={() => setArchiveView(true)}>Archive <span>{archivedRecords.length}</span></button></div>
+          <div className="admin-registration-filters"><label>Status<select value={statusFilter} disabled={archiveView} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="for_confirmation">For confirmation</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select></label><label>Attendance date<select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}><option value="all">All dates</option>{dates.map((date) => <option value={date} key={date}>{date}</option>)}</select></label><button type="button" onClick={() => { setQuery(""); setStatusFilter("all"); setDateFilter("all"); }}>Reset filters</button><span>{filtered.length} result{filtered.length === 1 ? "" : "s"}</span></div>
           {saveError && <div className="platform-inline-error" role="alert">{saveError}</div>}
           <div className="admin-registration-table">
             <div className="admin-table-head"><span>Attendee</span><span>Schedule</span><span>Booking</span><span>Status</span><span>Action</span></div>
             {filtered.length ? filtered.map((record) => {
+              const archived = isArchivedRegistration(record);
               const paid = record.status === "paid" || record.status === "Paid";
               const rejected = record.status === "rejected" || record.status === "Rejected";
               return (
@@ -604,12 +626,8 @@ function RegistrationCenter() {
                   <div className="admin-attendee"><b>{String(record.name ?? "Registrant").slice(0, 1)}</b><span><strong>{String(record.name ?? "Registrant")}</strong><a href={`mailto:${String(record.email ?? "")}`}>{String(record.email ?? "—")}</a><small>{String(record.code ?? "NEW")}</small></span></div>
                   <div><strong>{String(record.event_date ?? "Date pending")}</strong><small>{String(record.phone ?? "—")}</small></div>
                   <div className="admin-booking-cell"><strong>{Number(record.quantity) || 1} ticket{Number(record.quantity) === 1 ? "" : "s"}</strong><small>₱{(Number(record.total_amount) || 0).toLocaleString("en-PH")} · {record.payment_method === "gcash" ? "GCash" : record.payment_method === "bank" ? "Bank" : "Method pending"}</small></div>
-                  <span className={`admin-status ${paid ? "paid" : rejected ? "rejected" : "pending"}`}><i />{paid ? "Paid" : rejected ? "Rejected" : "For confirmation"}</span>
-                  <button
-                    type="button"
-                    disabled={!record.id}
-                    onClick={() => setReviewing(record)}
-                  >Review</button>
+                  <span className={`admin-status ${archived ? "archived" : paid ? "paid" : rejected ? "rejected" : "pending"}`}><i />{archived ? "Archived" : paid ? "Paid" : rejected ? "Rejected" : "For confirmation"}</span>
+                  <div className="admin-row-actions">{!archived && <button type="button" disabled={!record.id} onClick={() => setReviewing(record)}>Review</button>}<button type="button" disabled={!record.id} onClick={() => void updateRecord(record.id, { status: archived ? restoreRegistrationStatus(record) : archiveRegistrationStatus(record) }).then(() => setSaveError("")).catch(() => setSaveError(archived ? "This registration could not be restored." : "This registration could not be archived."))}>{archived ? "Restore" : "Archive"}</button></div>
                 </article>
               );
             }) : <EmptyState message="No registrations match your search." />}

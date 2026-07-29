@@ -671,6 +671,16 @@ function RegistrationPage() {
     setError("");
     setSubmitting(true);
     try {
+      if (proofFile.size > 3_000_000) {
+        setError("Please upload a payment proof smaller than 3 MB.");
+        return;
+      }
+      const paymentProofData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.onerror = () => reject(new Error("Unable to read payment proof"));
+        reader.readAsDataURL(proofFile);
+      });
       const response = await fetch("/api/public-registration", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -684,6 +694,7 @@ function RegistrationPage() {
           payment_method: method,
           payment_reference: referenceNumber,
           payment_proof_name: proofFile.name,
+          payment_proof_data: paymentProofData,
         }),
       });
       const result = (await response.json()) as { error?: string };

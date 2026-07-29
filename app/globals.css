@@ -8718,3 +8718,55 @@ button.platform-nav-parent {
   .footer-invitation { grid-template-columns: 1fr; padding: 58px 24px; }.footer-invitation a { width: 100%; }.footer-lower { grid-template-columns: 1fr; gap: 25px; padding: 35px 24px; }.footer-navigation { flex-direction: column; gap: 12px; }.footer-signoff { flex-direction: column; padding: 16px 24px; }
   .account-workspace { padding: 18px 14px 60px; }.account-layout { grid-template-columns: 1fr; }.account-profile-card { min-height: auto; }
 }
+
+/* Registration archive, contrast, and footer integrity. */
+.home-2026 .main-content,
+.registration-2026 .main-content { overflow-x: clip; overflow-y: visible; }
+.home-2026 .footer,
+.registration-2026 .footer { width: 100%; height: auto; min-height: 0; overflow: visible; padding: 0; }
+.home-2026 .footer-inner,
+.registration-2026 .footer-inner { width: 100%; height: auto; display: block; overflow: visible; }
+.home-2026 .footer-invitation,
+.registration-2026 .footer-invitation { min-height: 0; padding-top: 48px; padding-bottom: 48px; }
+.home-2026 .footer-lower,
+.registration-2026 .footer-lower { min-height: 0; }
+
+.admin-registration-panel { color: #102724; background: #fff; }
+.admin-registration-panel .admin-eyebrow { color: #087168; font-weight: 750; }
+.admin-registration-panel h2 { color: #071d1a; font-size: clamp(32px, 3.2vw, 46px); }
+.admin-registration-panel header p { color: #4d625d; font-size: 13px; }
+.admin-registration-panel .platform-search input,
+.admin-registration-panel .platform-search input::placeholder { color: #18332f; }
+.admin-registration-panel .admin-table-head { color: #4c625d; font-weight: 750; }
+.admin-registration-panel .admin-registration-table article strong { color: #102724; }
+.admin-registration-panel .admin-registration-table article small,
+.admin-registration-panel .admin-attendee a { color: #5b706b; }
+.admin-registration-panel .platform-empty p { color: #526762; }
+
+.admin-registration-views { display: inline-flex; gap: 5px; margin: 0 0 14px; padding: 5px; border: 1px solid #d5e3df; border-radius: 14px; background: #eff6f3; }
+.admin-registration-views button { display: inline-flex; align-items: center; gap: 9px; min-height: 38px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: #506762; font-size: 11px; font-weight: 700; cursor: pointer; }
+.admin-registration-views button span { min-width: 24px; padding: 4px 7px; border-radius: 99px; background: rgba(10,102,94,.08); color: #0a665e; font-size: 9px; }
+.admin-registration-views button.is-active { background: #0b625b; color: #fff; box-shadow: 0 7px 18px rgba(11,98,91,.17); }
+.admin-registration-views button.is-active span { background: rgba(255,255,255,.16); color: #fff; }
+.admin-registration-filters select:disabled { opacity: .52; cursor: not-allowed; }
+.admin-status.archived { color: #5e6470; background: #eceff3; }.admin-status.archived i { background: #87909d; }
+.admin-row-actions { display: flex !important; align-items: center; justify-content: flex-end; gap: 7px !important; }
+.admin-row-actions button { min-height: 36px; padding: 7px 11px; border: 1px solid #cadbd6; border-radius: 99px; background: #fff; color: #0b665f; font-size: 9px; font-weight: 700; cursor: pointer; }
+.admin-row-actions button:last-child { color: #646d6b; }
+.registration-proof-link,
+.registration-proof-legacy { display: block; margin: -3px 0 8px; padding: 12px 14px; border: 1px solid rgba(168,231,223,.16); border-radius: 12px; background: rgba(168,231,223,.055); color: #a8e7df; font-size: 11px; overflow-wrap: anywhere; }
+.registration-proof-legacy { color: rgba(234,243,241,.56); }
+
+.ops-data-page .platform-metric { border-color: #1f3e39; background: #102724; }
+.ops-data-page .platform-metric span { color: #d9e8e5; font-weight: 600; }
+.ops-data-page .platform-metric strong { color: #a8e7df; font-size: clamp(28px, 3vw, 42px); font-weight: 750; text-shadow: 0 0 24px rgba(168,231,223,.08); }
+.ops-data-page .ops-stat-row b,
+.ops-data-page .ops-location-row b { color: #0b403b; }
+
+@media (max-width:1120px) {
+  .admin-row-actions { justify-content: flex-start; }
+}
+@media (max-width:680px) {
+  .admin-registration-views { width: 100%; }.admin-registration-views button { flex: 1; justify-content: center; }
+  .home-2026 .footer-invitation,.registration-2026 .footer-invitation { padding: 42px 22px; }
+}
