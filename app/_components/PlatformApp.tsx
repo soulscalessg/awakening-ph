@@ -87,6 +87,8 @@ type StoredRecord = {
   payment_method?: string;
   payment_reference?: string;
   payment_proof_name?: string;
+  payment_proof_path?: string;
+  payment_proof_mime_type?: string;
   organization?: string;
   source?: string;
   stage?: string;
@@ -676,13 +678,40 @@ function CRM() {
 }
 
 function RegistrationReviewModal({ record, dates, onClose, onSave }: { record: StoredRecord; dates: string[]; onClose: () => void; onSave: (payload: StoredRecord) => Promise<void> }) {
+  const legacyProof = (() => { try { const parsed = JSON.parse(String(record.payment_proof_name ?? "")) as { name?: string; data?: string }; return parsed.data?.startsWith("data:image/") ? parsed : null; } catch { return null; } })();
   const [attendanceDate, setAttendanceDate] = useState(String(record.event_date ?? ""));
   const [paymentMethod, setPaymentMethod] = useState(String(record.payment_method ?? ""));
   const [status, setStatus] = useState(String(record.status ?? "for_confirmation").toLowerCase().replaceAll(" ", "_"));
   const [saving, setSaving] = useState(false);
+  const [proofUrl, setProofUrl] = useState(legacyProof?.data ?? "");
+  const [proofLoading, setProofLoading] = useState(Boolean(record.payment_proof_path && !legacyProof?.data));
+  const [proofUnavailable, setProofUnavailable] = useState(Boolean(!record.payment_proof_path && !legacyProof?.data));
   const save = (nextStatus = status) => { setSaving(true); void onSave({ event_date: attendanceDate, payment_method: paymentMethod, status: nextStatus }).finally(() => setSaving(false)); };
-  const proof = (() => { try { const parsed = JSON.parse(String(record.payment_proof_name ?? "")) as { name?: string; data?: string }; return parsed.data?.startsWith("data:image/") ? parsed : null; } catch { return null; } })();
-  return <div className="platform-modal-backdrop" role="presentation" onMouseDown={onClose}><section className="platform-modal ops-modal registration-review-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><header><div><span className="admin-eyebrow">Registration review</span><h2>{String(record.name ?? "Registrant")}</h2><p>{String(record.code ?? "NEW")} · {Number(record.quantity) || 1} ticket{Number(record.quantity) === 1 ? "" : "s"}</p></div><button type="button" onClick={onClose} aria-label="Close">×</button></header><div className="registration-review-facts"><div><span>Email</span><strong>{String(record.email ?? "—")}</strong></div><div><span>Reference</span><strong>{String(record.payment_reference ?? "Not provided")}</strong></div><div><span>Amount</span><strong>₱{(Number(record.total_amount) || 0).toLocaleString("en-PH")}</strong></div></div>{proof?.data ? <a className="registration-proof-link" href={proof.data} target="_blank" rel="noreferrer">View payment proof · {proof.name || "Image"} ↗</a> : <p className="registration-proof-legacy">Payment proof on older records is stored as: {String(record.payment_proof_name ?? "Not provided")}</p>}<label>Attendance date <small>Per request only</small><select value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)}>{!dates.includes(attendanceDate) && <option value={attendanceDate}>{attendanceDate}</option>}{dates.map((date) => <option value={date} key={date}>{date}</option>)}</select></label><div className="ops-modal-grid"><label>Payment method<select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}><option value="">Not selected</option><option value="gcash">GCash</option><option value="bank">Bank transfer</option></select></label><label>Payment status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="for_confirmation">For confirmation</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select></label></div><footer className="registration-review-actions"><button type="button" className="danger" disabled={saving} onClick={() => save("rejected")}>Reject payment</button><button type="button" disabled={saving} onClick={() => save()}>Save changes</button><button type="button" className="platform-primary" disabled={saving} onClick={() => save("paid")}>Confirm payment</button></footer></section></div>;
+
+  useEffect(() => {
+    if (legacyProof?.data || !record.id || !record.payment_proof_path) return;
+    let active = true;
+    fetch(`/api/payment-proof?registration_id=${encodeURIComponent(record.id)}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Image not available");
+        return response.json() as Promise<{ url?: string }>;
+      })
+      .then((result) => {
+        if (!active || !result.url) return;
+        setProofUrl(result.url);
+        setProofUnavailable(false);
+      })
+      .catch(() => { if (active) setProofUnavailable(true); })
+      .finally(() => { if (active) setProofLoading(false); });
+    return () => { active = false; };
+  }, [legacyProof?.data, record.id, record.payment_proof_path]);
+
+  return <div className="platform-modal-backdrop" role="presentation" onMouseDown={onClose}><section className="platform-modal ops-modal registration-review-modal" role="dialog" aria-modal="true" aria-labelledby="registration-review-title" onMouseDown={(event) => event.stopPropagation()}><header><div><span className="admin-eyebrow">Registration review</span><h2 id="registration-review-title">{String(record.name ?? "Registrant")}</h2><p>{String(record.code ?? "NEW")} · {Number(record.quantity) || 1} ticket{Number(record.quantity) === 1 ? "" : "s"}</p></div><button type="button" onClick={onClose} aria-label="Close">×</button></header><div className="registration-review-facts"><div><span>Email</span><strong>{String(record.email ?? "—")}</strong></div><div><span>Reference</span><strong>{String(record.payment_reference ?? "Not provided")}</strong></div><div><span>Amount</span><strong>₱{(Number(record.total_amount) || 0).toLocaleString("en-PH")}</strong></div></div><div className="registration-proof-preview"><div className="registration-proof-title"><span>Proof of payment</span><small>{legacyProof?.name || String(record.payment_proof_name ?? "Uploaded image")}</small></div>{proofLoading ? <div className="registration-proof-loading">Opening secure preview…</div> : proofUrl && !proofUnavailable ? <><img src={proofUrl} alt={`Payment proof from ${String(record.name ?? "registrant")}`} onError={() => setProofUnavailable(true)} /><a href={proofUrl} target="_blank" rel="noreferrer">Open full image ↗</a></> : <div className="registration-proof-fallback"><strong>Image not available</strong><span>{record.payment_proof_name ? "The filename is saved, but this older or unavailable file has no viewable image." : "No payment proof was attached to this registration."}</span>{proofUrl && <a href={proofUrl} target="_blank" rel="noreferrer">Download original file ↗</a>}</div>}</div><label>Attendance date <small>Per request only</small><select value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)}>{!dates.includes(attendanceDate) && <option value={attendanceDate}>{attendanceDate}</option>}{dates.map((date) => <option value={date} key={date}>{date}</option>)}</select></label><div className="ops-modal-grid"><label>Payment method<select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}><option value="">Not selected</option><option value="gcash">GCash</option><option value="bank">Bank transfer</option></select></label><label>Payment status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="for_confirmation">For confirmation</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select></label></div><footer className="registration-review-actions"><button type="button" className="danger" disabled={saving} onClick={() => save("rejected")}>Reject payment</button><button type="button" disabled={saving} onClick={() => save()}>Save changes</button><button type="button" className="platform-primary" disabled={saving} onClick={() => save("paid")}>Confirm payment</button></footer></section></div>;
+}
+
+function RegistrationDeleteModal({ record, onClose, onConfirm }: { record: StoredRecord; onClose: () => void; onConfirm: () => Promise<void> }) {
+  const [deleting, setDeleting] = useState(false);
+  return <div className="platform-modal-backdrop" role="presentation" onMouseDown={onClose}><section className="platform-modal ops-modal registration-delete-modal" role="alertdialog" aria-modal="true" aria-labelledby="registration-delete-title" aria-describedby="registration-delete-description" onMouseDown={(event) => event.stopPropagation()}><span className="registration-delete-mark" aria-hidden="true">!</span><header><div><span className="admin-eyebrow">Permanent action</span><h2 id="registration-delete-title">Delete archived registration?</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header><p id="registration-delete-description"><strong>{String(record.name ?? "This attendee")}</strong> and their saved payment proof will be permanently removed from the Awakening database. This cannot be undone.</p><footer><button type="button" disabled={deleting} onClick={onClose}>Keep registration</button><button type="button" className="platform-danger-button" disabled={deleting} onClick={() => { setDeleting(true); void onConfirm().finally(() => setDeleting(false)); }}>{deleting ? "Deleting…" : "Delete permanently"}</button></footer></section></div>;
 }
 
 function isArchivedRegistration(record: StoredRecord) {
@@ -704,9 +733,11 @@ function RegistrationCenter() {
   const [dateFilter, setDateFilter] = useState("all");
   const [archiveView, setArchiveView] = useState(false);
   const [reviewing, setReviewing] = useState<StoredRecord | null>(null);
+  const [deletingRecord, setDeletingRecord] = useState<StoredRecord | null>(null);
+  const [notice, setNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const [saveError, setSaveError] = useState("");
   const seededRegistrants = registrants.map((record) => ({ ...record, event_date: record.date, status: record.status === "Paid" ? "paid" : "for_confirmation" }));
-  const { records, connection, updateRecord } = usePlatformRecords("registrations", seededRegistrants);
+  const { records, connection, updateRecord, deleteRecord } = usePlatformRecords("registrations", seededRegistrants);
   const activeRecords = records.filter((record) => !isArchivedRegistration(record));
   const archivedRecords = records.filter(isArchivedRegistration);
   const viewRecords = archiveView ? archivedRecords : activeRecords;
@@ -761,7 +792,7 @@ function RegistrationCenter() {
                   <div><strong>{String(record.event_date ?? "Date pending")}</strong><small>{String(record.phone ?? "—")}</small></div>
                   <div className="admin-booking-cell"><strong>{Number(record.quantity) || 1} ticket{Number(record.quantity) === 1 ? "" : "s"}</strong><small>₱{(Number(record.total_amount) || 0).toLocaleString("en-PH")} · {record.payment_method === "gcash" ? "GCash" : record.payment_method === "bank" ? "Bank" : "Method pending"}</small></div>
                   <span className={`admin-status ${archived ? "archived" : paid ? "paid" : rejected ? "rejected" : "pending"}`}><i />{archived ? "Archived" : paid ? "Paid" : rejected ? "Rejected" : "For confirmation"}</span>
-                  <div className="admin-row-actions">{!archived && <button type="button" disabled={!record.id} onClick={() => setReviewing(record)}>Review</button>}<button type="button" disabled={!record.id} onClick={() => void updateRecord(record.id, { status: archived ? restoreRegistrationStatus(record) : archiveRegistrationStatus(record) }).then(() => setSaveError("")).catch(() => setSaveError(archived ? "This registration could not be restored." : "This registration could not be archived."))}>{archived ? "Restore" : "Archive"}</button></div>
+                  <div className="admin-row-actions">{!archived && <button type="button" disabled={!record.id} onClick={() => setReviewing(record)}>Review</button>}<button type="button" disabled={!record.id} onClick={() => void updateRecord(record.id, { status: archived ? restoreRegistrationStatus(record) : archiveRegistrationStatus(record) }).then(() => { setSaveError(""); setNotice({ tone: "success", message: archived ? "Registration restored." : "Registration archived." }); }).catch(() => { const message = archived ? "This registration could not be restored." : "This registration could not be archived."; setSaveError(message); setNotice({ tone: "error", message }); })}>{archived ? "Restore" : "Archive"}</button>{archived && <button type="button" className="is-delete" disabled={!record.id} onClick={() => setDeletingRecord(record)}>Delete</button>}</div>
                 </article>
               );
             }) : <EmptyState message="No registrations match your search." />}
@@ -769,6 +800,8 @@ function RegistrationCenter() {
         </section>
       </section>
       {reviewing && <RegistrationReviewModal record={reviewing} dates={dates} onClose={() => setReviewing(null)} onSave={async (payload) => { await updateRecord(reviewing.id, payload); setReviewing(null); setSaveError(""); }} />}
+      {deletingRecord && <RegistrationDeleteModal record={deletingRecord} onClose={() => setDeletingRecord(null)} onConfirm={async () => { try { await deleteRecord(deletingRecord.id); setDeletingRecord(null); setSaveError(""); setNotice({ tone: "success", message: "Archived registration permanently deleted." }); } catch { const message = "The registration could not be deleted. It remains safely archived."; setSaveError(message); setNotice({ tone: "error", message }); } }} />}
+      {notice && <div className={`platform-toast ${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"}><span aria-hidden="true">{notice.tone === "success" ? "✓" : "!"}</span><p>{notice.message}</p><button type="button" onClick={() => setNotice(null)} aria-label="Dismiss notification">×</button></div>}
     </PlatformShell>
   );
 }

@@ -1,5 +1,5 @@
-import { PLATFORM_SESSION_COOKIE, verifyPlatformSession } from "../../../platform-auth";
-import { isSupabaseConfigured, supabaseRequest } from "../../../supabase-server";
+import { authorizePlatformRequest } from "../../../platform-auth";
+import { deletePrivateObject, isSupabaseConfigured, supabaseRequest } from "../../../supabase-server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,19 +15,6 @@ const resources = {
   "sponsorship-applications": "awakening_sponsorship_applications",
 } as const;
 
-function cookieValue(request: Request, name: string) {
-  const cookies = request.headers.get("cookie") ?? "";
-  for (const item of cookies.split(";")) {
-    const [key, ...value] = item.trim().split("=");
-    if (key === name) return value.join("=");
-  }
-  return undefined;
-}
-
-async function authorize(request: Request) {
-  return verifyPlatformSession(cookieValue(request, PLATFORM_SESSION_COOKIE));
-}
-
 async function resolveTable(context: { params: Promise<{ resource: string }> }) {
   const { resource } = await context.params;
   return resources[resource as keyof typeof resources] ?? null;
@@ -35,7 +22,7 @@ async function resolveTable(context: { params: Promise<{ resource: string }> }) 
 
 function unavailable() {
   return Response.json(
-    { error: "Supabase is not configured for this deployment." },
+    { error: "Awakening Server is not configured for this deployment." },
     { status: 503 },
   );
 }
@@ -44,7 +31,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ resource: string }> },
 ) {
-  if (!(await authorize(request))) {
+  if (!(await authorizePlatformRequest(request))) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
   const table = await resolveTable(context);
@@ -68,7 +55,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ resource: string }> },
 ) {
-  if (!(await authorize(request))) {
+  if (!(await authorizePlatformRequest(request))) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
   const table = await resolveTable(context);
@@ -95,7 +82,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ resource: string }> },
 ) {
-  if (!(await authorize(request))) {
+  if (!(await authorizePlatformRequest(request))) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
   const table = await resolveTable(context);
@@ -129,7 +116,7 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ resource: string }> },
 ) {
-  if (!(await authorize(request))) {
+  if (!(await authorizePlatformRequest(request))) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
   const table = await resolveTable(context);
@@ -141,10 +128,20 @@ export async function DELETE(
   if (!id) return Response.json({ error: "Record id is required." }, { status: 400 });
 
   try {
+    let paymentProofPath = "";
+    if (table === "awakening_registrations") {
+      const records = await supabaseRequest<{ payment_proof_path?: string }[]>(
+        `${table}?select=payment_proof_path&id=eq.${encodeURIComponent(id)}&limit=1`,
+      );
+      paymentProofPath = String(records[0]?.payment_proof_path ?? "");
+    }
     await supabaseRequest<void>(`${table}?id=eq.${encodeURIComponent(id)}`, {
       method: "DELETE",
       prefer: "return=minimal",
     });
+    if (paymentProofPath) {
+      await deletePrivateObject("payment-proofs", paymentProofPath).catch(() => undefined);
+    }
     return new Response(null, { status: 204 });
   } catch (error) {
     return Response.json(

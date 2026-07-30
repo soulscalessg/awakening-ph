@@ -3,6 +3,15 @@ const encoder = new TextEncoder();
 export const PLATFORM_SESSION_COOKIE = "awakening_platform_session";
 export const PLATFORM_SESSION_SECONDS = 60 * 60 * 8;
 
+function requestCookie(request: Request, name: string) {
+  const cookies = request.headers.get("cookie") ?? "";
+  for (const item of cookies.split(";")) {
+    const [key, ...value] = item.trim().split("=");
+    if (key === name) return value.join("=");
+  }
+  return undefined;
+}
+
 function getSecret() {
   return process.env.PLATFORM_AUTH_SECRET ?? "";
 }
@@ -66,4 +75,8 @@ export async function verifyPlatformSession(token?: string) {
     fromHex(signature),
     encoder.encode(payload),
   );
+}
+
+export async function authorizePlatformRequest(request: Request) {
+  return verifyPlatformSession(requestCookie(request, PLATFORM_SESSION_COOKIE));
 }

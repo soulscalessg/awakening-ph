@@ -1,9 +1,24 @@
-import { isSupabaseConfigured, supabaseRequest } from "../../supabase-server";
+import { takeRateLimit } from "../../rate-limit";
+import {
+  deletePrivateObject,
+  isSupabaseConfigured,
+  supabaseRequest,
+  uploadPrivateObject,
+} from "../../supabase-server";
 import { scheduleOptionLabel, type PublicSchedule } from "../../schedule-format";
 
 export const dynamic = "force-dynamic";
 
 const TICKET_PRICE = 1499;
+const PAYMENT_PROOF_BUCKET = "payment-proofs";
+const MAX_PROOF_BYTES = 5 * 1024 * 1024;
+const proofExtensions: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/heic": "heic",
+  "image/heif": "heif",
+};
 
 function text(value: unknown, maxLength: number) {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, maxLength);
@@ -17,6 +32,27 @@ async function findExistingRegistration(email: string, paymentReference: string)
   return records[0] ?? null;
 }
 
+function decodeProof(dataUri: string) {
+  const match = /^data:(image\/(?:jpeg|png|webp|heic|heif));base64,([a-z0-9+/=\s]+)$/i.exec(dataUri);
+  if (!match) return null;
+  const mimeType = match[1].toLowerCase();
+  if (!proofExtensions[mimeType]) return null;
+  let binary = "";
+  try {
+    binary = atob(match[2].replace(/\s/g, ""));
+  } catch {
+    return null;
+  }
+  if (!binary.length || binary.length > MAX_PROOF_BYTES) return null;
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const isJpeg = mimeType === "image/jpeg" && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const isPng = mimeType === "image/png" && bytes.slice(0, 8).every((byte, index) => byte === [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a][index]);
+  const isWebp = mimeType === "image/webp" && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+  const heifBrand = String.fromCharCode(...bytes.slice(4, 12));
+  const isHeif = (mimeType === "image/heic" || mimeType === "image/heif") && heifBrand.startsWith("ftyp");
+  return isJpeg || isPng || isWebp || isHeif ? { bytes, mimeType } : null;
+}
+
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
     return Response.json(
@@ -25,6 +61,7 @@ export async function POST(request: Request) {
     );
   }
 
+  let uploadedPath = "";
   try {
     const payload = (await request.json()) as Record<string, unknown>;
     const name = text(payload.name, 160);
@@ -50,9 +87,8 @@ export async function POST(request: Request) {
     if (!new Set(["gcash", "bank"]).has(paymentMethod)) {
       return Response.json({ error: "Choose GCash or bank transfer." }, { status: 400 });
     }
-    if (!paymentProofData.startsWith("data:image/") || paymentProofData.length > 4_100_000) {
-      return Response.json({ error: "Upload a valid payment proof image smaller than 3 MB." }, { status: 400 });
-    }
+    const proof = decodeProof(paymentProofData);
+    if (!proof) return Response.json({ error: "Upload a valid JPG, PNG, WebP, HEIC, or HEIF payment proof up to 5 MB." }, { status: 400 });
 
     const matchingSchedules = await supabaseRequest<PublicSchedule[]>(
       `awakening_schedules?select=id,event_at,ends_at,venue,city,capacity,status,timezone,country_code&id=eq.${encodeURIComponent(scheduleId)}&status=eq.scheduled&limit=1`,
@@ -71,6 +107,17 @@ export async function POST(request: Request) {
       return Response.json({ data: existing, duplicate: true }, { status: 200 });
     }
 
+    const rate = await takeRateLimit(request, "registration-submit", 5, 3600, email);
+    if (!rate.allowed) {
+      return Response.json(
+        { error: "Too many registration attempts. Please wait before trying again with the same details." },
+        { status: 429, headers: { "retry-after": String(rate.retry_after_seconds) } },
+      );
+    }
+
+    uploadedPath = `registrations/${crypto.randomUUID()}/payment-proof.${proofExtensions[proof.mimeType]}`;
+    await uploadPrivateObject(PAYMENT_PROOF_BUCKET, uploadedPath, proof.bytes, proof.mimeType);
+
     const record = {
       name,
       email,
@@ -81,7 +128,9 @@ export async function POST(request: Request) {
       total_amount: TICKET_PRICE * quantity,
       payment_method: paymentMethod,
       payment_reference: paymentReference,
-      payment_proof_name: JSON.stringify({ name: paymentProofName, data: paymentProofData }),
+      payment_proof_name: paymentProofName,
+      payment_proof_path: uploadedPath,
+      payment_proof_mime_type: proof.mimeType,
       status: "for_confirmation",
     };
 
@@ -96,12 +145,18 @@ export async function POST(request: Request) {
         return Response.json({ data: data[0] }, { status: 201 });
       } catch (saveError) {
         const recovered = await findExistingRegistration(email, paymentReference).catch(() => null);
-        if (recovered) return Response.json({ data: recovered, recovered: true }, { status: 200 });
+        if (recovered) {
+          if (String(recovered.payment_proof_path ?? "") !== uploadedPath) {
+            await deletePrivateObject(PAYMENT_PROOF_BUCKET, uploadedPath).catch(() => undefined);
+          }
+          return Response.json({ data: recovered, recovered: true }, { status: 200 });
+        }
         if (attempt === 1) throw saveError;
       }
     }
     return Response.json({ error: "Registration could not be verified." }, { status: 502 });
   } catch {
+    if (uploadedPath) await deletePrivateObject(PAYMENT_PROOF_BUCKET, uploadedPath).catch(() => undefined);
     return Response.json(
       { error: "Your registration was not confirmed as saved. Nothing was charged or discarded—please retry with the same payment reference." },
       { status: 502 },

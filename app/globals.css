@@ -2619,6 +2619,134 @@ button:disabled {
   }
 }
 
+/* Feedback closeout: resilient admin navigation, secure proof review, and destructive-action feedback. */
+.platform-shell {
+  --platform-sidebar-width: 268px;
+}
+
+.platform-sidebar {
+  width: var(--platform-sidebar-width);
+  box-sizing: border-box;
+}
+
+.platform-sidebar nav,
+.platform-nav-group,
+.platform-nav-group > a,
+.platform-nav-parent,
+.platform-subnav,
+.platform-subnav a {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.platform-main {
+  width: auto;
+  min-width: 0;
+  margin-left: var(--platform-sidebar-width);
+}
+
+.registration-review-modal {
+  width: min(720px, 100%);
+  max-height: min(92vh, 920px);
+  overflow-y: auto;
+}
+
+.registration-proof-preview {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(168, 231, 223, 0.2);
+  border-radius: 15px;
+  background: #0b1312;
+}
+
+.registration-proof-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  color: #ecf7f5;
+}
+
+.registration-proof-title span { font-size: 12px; font-weight: 750; }
+.registration-proof-title small { min-width: 0; overflow: hidden; color: rgba(234, 243, 241, 0.55); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.registration-proof-preview > img { width: 100%; max-height: 390px; display: block; object-fit: contain; border-radius: 10px; background: #fff; }
+.registration-proof-preview > a,
+.registration-proof-fallback a { color: #a8e7df; font-size: 11px; font-weight: 700; }
+.registration-proof-loading { min-height: 190px; display: grid; place-items: center; color: rgba(234, 243, 241, 0.62); font-size: 12px; }
+.registration-proof-fallback { min-height: 150px; display: grid; align-content: center; justify-items: center; gap: 8px; padding: 22px; border: 1px dashed rgba(234, 243, 241, 0.16); border-radius: 11px; color: rgba(234, 243, 241, 0.58); text-align: center; }
+.registration-proof-fallback strong { color: #edf7f5; font-size: 15px; }
+.registration-proof-fallback span { max-width: 430px; font-size: 11px; line-height: 1.55; }
+
+.admin-row-actions .is-delete,
+.platform-danger-button {
+  border-color: rgba(232, 95, 95, 0.34) !important;
+  background: rgba(232, 95, 95, 0.09) !important;
+  color: #b92f3b !important;
+}
+
+.registration-delete-modal { width: min(520px, 100%); gap: 14px; }
+.registration-delete-modal > p { margin: 0; color: rgba(234, 243, 241, 0.67); font-size: 13px; line-height: 1.7; }
+.registration-delete-modal > p strong { color: #fff; }
+.registration-delete-mark { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(232, 95, 95, 0.35); border-radius: 50%; background: rgba(232, 95, 95, 0.1); color: #ff9ca4; font-size: 20px; font-weight: 800; }
+.platform-danger-button { min-height: 40px; padding: 8px 17px; border: 1px solid; border-radius: 999px; cursor: pointer; font-weight: 750; }
+
+.platform-toast {
+  position: fixed;
+  z-index: 260;
+  right: max(22px, env(safe-area-inset-right));
+  bottom: max(22px, env(safe-area-inset-bottom));
+  width: min(390px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(168, 231, 223, 0.22);
+  border-radius: 15px;
+  background: #0b1b18;
+  color: #edf7f5;
+  box-shadow: 0 22px 65px rgba(0, 0, 0, 0.34);
+  animation: awakening-rise 260ms ease-out both;
+}
+.platform-toast > span { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: rgba(168, 231, 223, 0.13); color: #a8e7df; font-weight: 800; }
+.platform-toast p { margin: 0; font-size: 11px; line-height: 1.45; }
+.platform-toast button { border: 0; background: transparent; color: rgba(255, 255, 255, 0.6); font-size: 20px; cursor: pointer; }
+.platform-toast.error { border-color: rgba(232, 95, 95, 0.35); }
+.platform-toast.error > span { background: rgba(232, 95, 95, 0.12); color: #ff9ca4; }
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  .platform-shell { --platform-sidebar-width: 236px; }
+  .platform-sidebar { padding-right: 10px; padding-left: 10px; }
+  .platform-nav-group b { font-size: 12px; }
+  .platform-subnav { margin-left: 26px; }
+}
+
+@media (max-width: 1120px) and (min-width: 681px) {
+  .admin-registration-table article { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 14px 22px; }
+  .admin-registration-table article .admin-status { justify-self: start; }
+  .admin-row-actions { justify-content: flex-start; }
+}
+
+@media (max-width: 900px) {
+  .platform-shell { --platform-sidebar-width: min(86vw, 300px); }
+  .platform-sidebar { inset: 66px auto 0 0; transform: translateX(-105%); }
+  .platform-sidebar.is-open { transform: translateX(0); }
+  .platform-main { width: 100%; margin-left: 0; }
+  .platform-shell.is-sidebar-collapsed .platform-sidebar { transform: translateX(-105%); }
+  .registration-review-modal { max-height: calc(100dvh - 28px); padding: 20px; }
+}
+
+@media (max-width: 520px) {
+  .registration-review-facts { grid-template-columns: 1fr; }
+  .registration-proof-title { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .registration-proof-title small { width: 100%; }
+  .registration-review-actions { align-items: stretch !important; flex-direction: column; }
+  .registration-review-actions button { width: 100%; }
+  .platform-toast { right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); }
+}
+
 /* Operations usability pass — collapsible navigation, clear contrast, account and extraction tools */
 @media (min-width: 901px) {
   .home-2026 .topbar,
@@ -8842,4 +8970,38 @@ textarea:focus-visible {
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+}
+
+/* Final responsive navigation lock. */
+.platform-shell { --platform-sidebar-width: 268px; }
+.platform-sidebar { width: var(--platform-sidebar-width); box-sizing: border-box; }
+.platform-sidebar nav,
+.platform-nav-group,
+.platform-nav-group > a,
+.platform-nav-parent,
+.platform-subnav,
+.platform-subnav a { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.platform-main { width: auto; min-width: 0; margin-left: var(--platform-sidebar-width); }
+.registration-review-modal { width: min(720px, 100%); max-height: min(92vh, 920px); overflow-y: auto; }
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  .platform-shell { --platform-sidebar-width: 236px; }
+  .platform-sidebar { padding-right: 10px; padding-left: 10px; }
+  .platform-nav-group b { font-size: 12px; }
+  .platform-subnav { margin-left: 26px; }
+}
+
+@media (max-width: 1120px) and (min-width: 681px) {
+  .admin-registration-table article { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 14px 22px; }
+  .admin-registration-table article .admin-status { justify-self: start; }
+  .admin-row-actions { justify-content: flex-start; }
+}
+
+@media (max-width: 900px) {
+  .platform-shell { --platform-sidebar-width: min(86vw, 300px); }
+  .platform-sidebar { inset: 66px auto 0 0; transform: translateX(-105%); }
+  .platform-sidebar.is-open { transform: translateX(0); }
+  .platform-main { width: 100%; margin-left: 0; }
+  .platform-shell.is-sidebar-collapsed .platform-sidebar { transform: translateX(-105%); }
+  .registration-review-modal { max-height: calc(100dvh - 28px); padding: 20px; }
 }

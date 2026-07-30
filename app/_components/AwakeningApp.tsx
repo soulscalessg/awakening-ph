@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, Fragment, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   BuildingIcon,
   CalendarIcon,
@@ -649,14 +649,12 @@ function RegistrationPage() {
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [openingPayment, setOpeningPayment] = useState(false);
+  const paymentRequestActive = useRef(false);
 
   const total = useMemo(() => 1499 * quantity, [quantity]);
   const selectedSchedule = publicSchedules.find((item) => item.id === scheduleId);
   const schedule = selectedSchedule ? scheduleOptionLabel(selectedSchedule) : "";
-
-  useEffect(() => {
-    if (scheduleId && !selectedSchedule) setScheduleId("");
-  }, [scheduleId, selectedSchedule]);
 
   function advanceTo(nextStep: number) {
     setError("");
@@ -680,6 +678,31 @@ function RegistrationPage() {
     window.scrollTo({ top: 500, behavior: "smooth" });
   }
 
+  async function continueToPayment() {
+    if (paymentRequestActive.current) return;
+    paymentRequestActive.current = true;
+    setError("");
+    setOpeningPayment(true);
+    try {
+      const response = await fetch("/api/registration-checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, email, phone, schedule_id: scheduleId }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setError(result.error ?? "Payment could not be opened right now.");
+        return;
+      }
+      advanceTo(3);
+    } catch {
+      setError("Payment could not be opened right now. Please try again.");
+    } finally {
+      paymentRequestActive.current = false;
+      setOpeningPayment(false);
+    }
+  }
+
   async function confirmRegistration() {
     if (!referenceNumber.trim() || !proofFile) {
       setError("Please complete all payment fields");
@@ -688,8 +711,8 @@ function RegistrationPage() {
     setError("");
     setSubmitting(true);
     try {
-      if (proofFile.size > 3_000_000) {
-        setError("Please upload a payment proof smaller than 3 MB.");
+      if (proofFile.size > 5 * 1024 * 1024) {
+        setError("Please upload a payment proof no larger than 5 MB.");
         return;
       }
       const paymentProofData = await new Promise<string>((resolve, reject) => {
@@ -866,8 +889,9 @@ function RegistrationPage() {
                 </div>
                 <div className="source-form-actions">
                   <button type="button" className="source-secondary-button" onClick={() => advanceTo(1)}>Back</button>
-                  <button type="button" className="source-primary-button" disabled={!name || !email || !phone} onClick={() => advanceTo(3)}>Continue to Payment</button>
+                  <button type="button" className="source-primary-button" disabled={!name || !email || !phone || openingPayment} onClick={() => void continueToPayment()}>{openingPayment ? "Opening Payment…" : "Continue to Payment"}</button>
                 </div>
+                {error && <div className="source-error" role="alert">{error}</div>}
               </div>
             </article>
           )}
@@ -936,7 +960,7 @@ function RegistrationPage() {
                   <div className="source-proof-tip">💡 Make sure your reference number matches your payment receipt to avoid delays</div>
                   <div className="source-input-stack">
                     <label className="source-field">Reference Number *<input value={referenceNumber} onChange={(event) => setReferenceNumber(event.target.value)} placeholder="Enter your payment reference number" /></label>
-                    <label className="source-field source-file-field">Proof of Payment *<input type="file" accept="image/*" onChange={(event) => setProofFile(event.target.files?.[0] ?? null)} /></label>
+                    <label className="source-field source-file-field">Proof of Payment *<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" onChange={(event) => setProofFile(event.target.files?.[0] ?? null)} /><small>JPG, PNG, WebP, HEIC, or HEIF · up to 5 MB</small></label>
                   </div>
                   {error && <div className="source-error" role="alert">{error}</div>}
                   <div className="source-form-actions">

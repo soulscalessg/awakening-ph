@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const applicationRoot = new URL("../", import.meta.url);
@@ -206,4 +207,35 @@ test("protects database APIs and fails safely before Supabase is configured", as
   });
   assert.equal(organizationResponse.status, 503);
   assert.match(await organizationResponse.text(), /not configured/i);
+
+  const proofResponse = await render("/api/payment-proof?registration_id=00000000-0000-4000-8000-000000000000", {
+    headers: { accept: "application/json" },
+  });
+  assert.equal(proofResponse.status, 401);
+
+  const checkoutResponse = await render("/api/registration-checkout", {
+    method: "POST",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify({ name: "Test", email: "test@example.com", phone: "+63 900", schedule_id: "00000000-0000-4000-8000-000000000000" }),
+  });
+  assert.equal(checkoutResponse.status, 503);
+});
+
+test("includes the PDF feedback safeguards in source and schema", async () => {
+  const [registration, platform, styles, migration] = await Promise.all([
+    readFile(new URL("../app/_components/AwakeningApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/_components/PlatformApp.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/202607300001_secure_payment_proofs_and_rate_limits.sql", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(registration, /\/api\/registration-checkout/);
+  assert.match(registration, /openingPayment/);
+  assert.match(platform, /Delete permanently/);
+  assert.match(platform, /\/api\/payment-proof\?registration_id=/);
+  assert.match(platform, /Image not available/);
+  assert.match(styles, /@media \(max-width: 900px\)[\s\S]*?\.platform-sidebar\.is-open/);
+  assert.match(migration, /payment_proof_path text/);
+  assert.match(migration, /'payment-proofs'/);
+  assert.match(migration, /awakening_take_rate_limit/);
 });

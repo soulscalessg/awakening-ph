@@ -9,6 +9,20 @@ function getSupabaseConfig() {
   return { url, secretKey };
 }
 
+function storagePath(bucket: string, objectPath: string) {
+  return `${encodeURIComponent(bucket)}/${objectPath.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+function storageHeaders(contentType?: string) {
+  const config = getSupabaseConfig();
+  if (!config) throw new Error("Awakening Server is not configured.");
+  const headers = new Headers();
+  headers.set("apikey", config.secretKey);
+  headers.set("authorization", `Bearer ${config.secretKey}`);
+  if (contentType) headers.set("content-type", contentType);
+  return { config, headers };
+}
+
 export function isSupabaseConfigured() {
   return Boolean(getSupabaseConfig());
 }
@@ -41,4 +55,52 @@ export async function supabaseRequest<T>(
 
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+export async function uploadPrivateObject(
+  bucket: string,
+  objectPath: string,
+  bytes: Uint8Array,
+  contentType: string,
+) {
+  const { config, headers } = storageHeaders(contentType);
+  headers.set("x-upsert", "false");
+  const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const response = await fetch(`${config.url}/storage/v1/object/${storagePath(bucket, objectPath)}`, {
+    method: "POST",
+    headers,
+    body,
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Awakening file upload failed (${response.status}).`);
+}
+
+export async function deletePrivateObject(bucket: string, objectPath: string) {
+  const { config, headers } = storageHeaders("application/json");
+  const response = await fetch(`${config.url}/storage/v1/object/${encodeURIComponent(bucket)}`, {
+    method: "DELETE",
+    headers,
+    body: JSON.stringify({ prefixes: [objectPath] }),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Awakening file cleanup failed (${response.status}).`);
+}
+
+export async function createPrivateObjectSignedUrl(
+  bucket: string,
+  objectPath: string,
+  expiresIn = 300,
+) {
+  const { config, headers } = storageHeaders("application/json");
+  const response = await fetch(`${config.url}/storage/v1/object/sign/${storagePath(bucket, objectPath)}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ expiresIn }),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Awakening file preview failed (${response.status}).`);
+  const result = (await response.json()) as { signedURL?: string; signedUrl?: string };
+  const signedPath = result.signedURL ?? result.signedUrl;
+  if (!signedPath) throw new Error("Awakening file preview was not acknowledged.");
+  return signedPath.startsWith("http") ? signedPath : `${config.url}${signedPath.startsWith("/") ? "" : "/"}${signedPath}`;
 }
