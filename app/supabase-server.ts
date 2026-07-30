@@ -102,5 +102,8 @@ export async function createPrivateObjectSignedUrl(
   const result = (await response.json()) as { signedURL?: string; signedUrl?: string };
   const signedPath = result.signedURL ?? result.signedUrl;
   if (!signedPath) throw new Error("Awakening file preview was not acknowledged.");
-  return signedPath.startsWith("http") ? signedPath : `${config.url}${signedPath.startsWith("/") ? "" : "/"}${signedPath}`;
+  if (signedPath.startsWith("http")) return signedPath;
+  if (signedPath.startsWith("/storage/v1/")) return `${config.url}${signedPath}`;
+  const normalized = signedPath.startsWith("/") ? signedPath : `/${signedPath}`;
+  return `${config.url}/storage/v1${normalized}`;
 }

@@ -194,7 +194,7 @@ function usePlatformRecords(resource: string, initial: StoredRecord[] = []) {
         });
     };
     loadRecords();
-    const refreshEvery = resource === "registrations" ? 3_000 : resource === "schedules" ? 10_000 : 0;
+    const refreshEvery = resource === "registrations" ? 10_000 : resource === "schedules" ? 15_000 : 0;
     const timer = refreshEvery ? window.setInterval(loadRecords, refreshEvery) : undefined;
     return () => {
       active = false;
@@ -678,35 +678,36 @@ function CRM() {
 }
 
 function RegistrationReviewModal({ record, dates, onClose, onSave }: { record: StoredRecord; dates: string[]; onClose: () => void; onSave: (payload: StoredRecord) => Promise<void> }) {
-  const legacyProof = (() => { try { const parsed = JSON.parse(String(record.payment_proof_name ?? "")) as { name?: string; data?: string }; return parsed.data?.startsWith("data:image/") ? parsed : null; } catch { return null; } })();
   const [attendanceDate, setAttendanceDate] = useState(String(record.event_date ?? ""));
   const [paymentMethod, setPaymentMethod] = useState(String(record.payment_method ?? ""));
   const [status, setStatus] = useState(String(record.status ?? "for_confirmation").toLowerCase().replaceAll(" ", "_"));
   const [saving, setSaving] = useState(false);
-  const [proofUrl, setProofUrl] = useState(legacyProof?.data ?? "");
-  const [proofLoading, setProofLoading] = useState(Boolean(record.payment_proof_path && !legacyProof?.data));
-  const [proofUnavailable, setProofUnavailable] = useState(Boolean(!record.payment_proof_path && !legacyProof?.data));
+  const [proofUrl, setProofUrl] = useState("");
+  const [proofName, setProofName] = useState("Uploaded image");
+  const [proofLoading, setProofLoading] = useState(Boolean(record.id));
+  const [proofUnavailable, setProofUnavailable] = useState(Boolean(!record.id));
   const save = (nextStatus = status) => { setSaving(true); void onSave({ event_date: attendanceDate, payment_method: paymentMethod, status: nextStatus }).finally(() => setSaving(false)); };
 
   useEffect(() => {
-    if (legacyProof?.data || !record.id || !record.payment_proof_path) return;
+    if (!record.id) return;
     let active = true;
     fetch(`/api/payment-proof?registration_id=${encodeURIComponent(record.id)}`, { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Image not available");
-        return response.json() as Promise<{ url?: string }>;
+        return response.json() as Promise<{ url?: string; name?: string }>;
       })
       .then((result) => {
         if (!active || !result.url) return;
         setProofUrl(result.url);
+        setProofName(result.name || "Uploaded image");
         setProofUnavailable(false);
       })
       .catch(() => { if (active) setProofUnavailable(true); })
       .finally(() => { if (active) setProofLoading(false); });
     return () => { active = false; };
-  }, [legacyProof?.data, record.id, record.payment_proof_path]);
+  }, [record.id]);
 
-  return <div className="platform-modal-backdrop" role="presentation" onMouseDown={onClose}><section className="platform-modal ops-modal registration-review-modal" role="dialog" aria-modal="true" aria-labelledby="registration-review-title" onMouseDown={(event) => event.stopPropagation()}><header><div><span className="admin-eyebrow">Registration review</span><h2 id="registration-review-title">{String(record.name ?? "Registrant")}</h2><p>{String(record.code ?? "NEW")} · {Number(record.quantity) || 1} ticket{Number(record.quantity) === 1 ? "" : "s"}</p></div><button type="button" onClick={onClose} aria-label="Close">×</button></header><div className="registration-review-facts"><div><span>Email</span><strong>{String(record.email ?? "—")}</strong></div><div><span>Reference</span><strong>{String(record.payment_reference ?? "Not provided")}</strong></div><div><span>Amount</span><strong>₱{(Number(record.total_amount) || 0).toLocaleString("en-PH")}</strong></div></div><div className="registration-proof-preview"><div className="registration-proof-title"><span>Proof of payment</span><small>{legacyProof?.name || String(record.payment_proof_name ?? "Uploaded image")}</small></div>{proofLoading ? <div className="registration-proof-loading">Opening secure preview…</div> : proofUrl && !proofUnavailable ? <><img src={proofUrl} alt={`Payment proof from ${String(record.name ?? "registrant")}`} onError={() => setProofUnavailable(true)} /><a href={proofUrl} target="_blank" rel="noreferrer">Open full image ↗</a></> : <div className="registration-proof-fallback"><strong>Image not available</strong><span>{record.payment_proof_name ? "The filename is saved, but this older or unavailable file has no viewable image." : "No payment proof was attached to this registration."}</span>{proofUrl && <a href={proofUrl} target="_blank" rel="noreferrer">Download original file ↗</a>}</div>}</div><label>Attendance date <small>Per request only</small><select value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)}>{!dates.includes(attendanceDate) && <option value={attendanceDate}>{attendanceDate}</option>}{dates.map((date) => <option value={date} key={date}>{date}</option>)}</select></label><div className="ops-modal-grid"><label>Payment method<select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}><option value="">Not selected</option><option value="gcash">GCash</option><option value="bank">Bank transfer</option></select></label><label>Payment status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="for_confirmation">For confirmation</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select></label></div><footer className="registration-review-actions"><button type="button" className="danger" disabled={saving} onClick={() => save("rejected")}>Reject payment</button><button type="button" disabled={saving} onClick={() => save()}>Save changes</button><button type="button" className="platform-primary" disabled={saving} onClick={() => save("paid")}>Confirm payment</button></footer></section></div>;
+  return <div className="platform-modal-backdrop" role="presentation" onMouseDown={onClose}><section className="platform-modal ops-modal registration-review-modal" role="dialog" aria-modal="true" aria-labelledby="registration-review-title" onMouseDown={(event) => event.stopPropagation()}><header><div><span className="admin-eyebrow">Registration review</span><h2 id="registration-review-title">{String(record.name ?? "Registrant")}</h2><p>{String(record.code ?? "NEW")} · {Number(record.quantity) || 1} ticket{Number(record.quantity) === 1 ? "" : "s"}</p></div><button type="button" onClick={onClose} aria-label="Close">×</button></header><div className="registration-review-facts"><div><span>Email</span><strong>{String(record.email ?? "—")}</strong></div><div><span>Reference</span><strong>{String(record.payment_reference ?? "Not provided")}</strong></div><div><span>Amount</span><strong>₱{(Number(record.total_amount) || 0).toLocaleString("en-PH")}</strong></div></div><div className="registration-proof-preview"><div className="registration-proof-title"><span>Proof of payment</span><small>{proofName}</small></div>{proofLoading ? <div className="registration-proof-loading">Opening secure preview…</div> : proofUrl && !proofUnavailable ? <><img src={proofUrl} alt={`Payment proof from ${String(record.name ?? "registrant")}`} onError={() => setProofUnavailable(true)} /><a href={proofUrl} target="_blank" rel="noreferrer">Open full image ↗</a></> : <div className="registration-proof-fallback"><strong>Image not available</strong><span>This older or unavailable record has no viewable payment proof. New uploads are stored securely and appear here automatically.</span>{proofUrl && <a href={proofUrl} target="_blank" rel="noreferrer">Download original file ↗</a>}</div>}</div><label>Attendance date <small>Per request only</small><select value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)}>{!dates.includes(attendanceDate) && <option value={attendanceDate}>{attendanceDate}</option>}{dates.map((date) => <option value={date} key={date}>{date}</option>)}</select></label><div className="ops-modal-grid"><label>Payment method<select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}><option value="">Not selected</option><option value="gcash">GCash</option><option value="bank">Bank transfer</option></select></label><label>Payment status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="for_confirmation">For confirmation</option><option value="paid">Paid</option><option value="rejected">Rejected</option></select></label></div><footer className="registration-review-actions"><button type="button" className="danger" disabled={saving} onClick={() => save("rejected")}>Reject payment</button><button type="button" disabled={saving} onClick={() => save()}>Save changes</button><button type="button" className="platform-primary" disabled={saving} onClick={() => save("paid")}>Confirm payment</button></footer></section></div>;
 }
 
 function RegistrationDeleteModal({ record, onClose, onConfirm }: { record: StoredRecord; onClose: () => void; onConfirm: () => Promise<void> }) {
@@ -766,7 +767,7 @@ function RegistrationCenter() {
           <div className="admin-control-actions"><DataConnectionBadge state={connection} /><Link href="/platform/seminar-schedule-management" className="platform-primary">Manage schedules ↗</Link></div>
         </header>
 
-        <div className="admin-live-strip"><span><i />Awakening Server Online</span><p>{pending ? `${pending} payment${pending === 1 ? "" : "s"} waiting for confirmation` : "All payments reviewed"}</p><time>Live updates every 3 seconds</time></div>
+        <div className="admin-live-strip"><span><i />Awakening Server Online</span><p>{pending ? `${pending} payment${pending === 1 ? "" : "s"} waiting for confirmation` : "All payments reviewed"}</p><time>Live updates every 10 seconds</time></div>
 
         <div className="admin-metric-grid">
           <article><span>Active registrations</span><strong>{activeRecords.length}</strong><small>Archived records excluded</small></article>

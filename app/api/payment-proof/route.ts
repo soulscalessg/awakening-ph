@@ -29,7 +29,24 @@ export async function GET(request: Request) {
       `awakening_registrations?select=payment_proof_path,payment_proof_name,payment_proof_mime_type&id=eq.${encodeURIComponent(registrationId)}&limit=1`,
     );
     const record = records[0];
-    if (!record?.payment_proof_path) {
+    if (!record) {
+      return Response.json({ error: "Image not available." }, { status: 404 });
+    }
+    if (!record.payment_proof_path) {
+      try {
+        const legacy = JSON.parse(String(record.payment_proof_name ?? "")) as { name?: string; data?: string };
+        if (legacy.data?.startsWith("data:image/")) {
+          return Response.json({
+            url: legacy.data,
+            name: legacy.name || "Legacy payment proof",
+            mime_type: legacy.data.slice(5, legacy.data.indexOf(";")),
+            expires_in: 0,
+            legacy: true,
+          });
+        }
+      } catch {
+        // Older filename-only records intentionally fall through to the safe fallback.
+      }
       return Response.json({ error: "Image not available." }, { status: 404 });
     }
     const url = await createPrivateObjectSignedUrl("payment-proofs", record.payment_proof_path, 300);

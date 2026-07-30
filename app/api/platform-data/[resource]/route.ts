@@ -39,8 +39,11 @@ export async function GET(
   if (!isSupabaseConfigured()) return unavailable();
 
   try {
+    const selection = table === "awakening_registrations"
+      ? "id,code,name,email,phone,event_date,quantity,total_amount,payment_method,payment_reference,payment_proof_path,payment_proof_mime_type,status,schedule_id,created_at,updated_at"
+      : "*";
     const data = await supabaseRequest<Record<string, unknown>[]>(
-      `${table}?select=*&order=created_at.desc`,
+      `${table}?select=${selection}&order=created_at.desc`,
     );
     return Response.json({ data });
   } catch (error) {
