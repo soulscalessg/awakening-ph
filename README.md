@@ -58,3 +58,11 @@ content for every public route.
 The current registration flow is client-side only. Before accepting real
 registrations or payments, connect it to durable storage and server-side
 validation.
+
+## One-to-one backup and restoration
+
+The repository includes the complete UI, server routes, static assets, and
+ordered Supabase migrations. Encrypted production snapshots in `backups/`
+capture the application-table records and private Storage objects without
+committing credentials or plaintext customer data. See `backups/README.md` for
+the restoration procedure.

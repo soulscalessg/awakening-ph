@@ -43,3 +43,7 @@ next-env.d.ts
 /work/
 /System Screenshots/
 /pnpm-lock.yaml
+/backups/*.json
+/backups/*.json.gz
+!/backups/*.manifest.json
+/.database-backup-key

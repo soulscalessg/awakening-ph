@@ -1,0 +1,22 @@
+{
+  "format": "awakening-supabase-backup-parts",
+  "version": 1,
+  "totalBytes": 121097184,
+  "parts": [
+    {
+      "file": "supabase-production-2026-09-03.json.gz.enc.part-000",
+      "bytes": 52428800,
+      "sha256": "21209a82fee2194186126c60aa29cf8a3a969612c65ae06a286d46fd5d36ec7f"
+    },
+    {
+      "file": "supabase-production-2026-09-03.json.gz.enc.part-001",
+      "bytes": 52428800,
+      "sha256": "3e0ba3e85680d85dd978c606fe38e50473560f61d9b637bb550d737cb9c09179"
+    },
+    {
+      "file": "supabase-production-2026-09-03.json.gz.enc.part-002",
+      "bytes": 16239584,
+      "sha256": "40e17fddee012834aaee8ea4812e39ded1ca680915311c22ea8e2bc33d9de7a5"
+    }
+  ]
+}
