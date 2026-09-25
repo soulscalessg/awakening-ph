@@ -73,7 +73,7 @@ if (!apply) throw new Error("Restore is destructive. Re-run with --apply after v
 
 const authHeaders = {
   apikey: secretKey,
-  authorization: `Bearer ${secretKey}`,
+  ...(!secretKey.startsWith("sb_") && { authorization: `Bearer ${secretKey}` }),
 };
 
 async function checkedFetch(url, init = {}) {

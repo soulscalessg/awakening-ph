@@ -31,7 +31,7 @@ if (!baseUrl || !secretKey) {
 
 const authHeaders = {
   apikey: secretKey,
-  authorization: `Bearer ${secretKey}`,
+  ...(!secretKey.startsWith("sb_") && { authorization: `Bearer ${secretKey}` }),
 };
 
 async function checkedFetch(url, init = {}) {

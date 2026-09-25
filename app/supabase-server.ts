@@ -9,6 +9,15 @@ function getSupabaseConfig() {
   return { url, secretKey };
 }
 
+function applySupabaseAuthHeaders(headers: Headers, secretKey: string) {
+  headers.set("apikey", secretKey);
+  // The new sb_secret_* keys are opaque API keys, not JWTs. Legacy
+  // service_role keys still require the bearer header for compatibility.
+  if (!secretKey.startsWith("sb_")) {
+    headers.set("authorization", `Bearer ${secretKey}`);
+  }
+}
+
 function storagePath(bucket: string, objectPath: string) {
   return `${encodeURIComponent(bucket)}/${objectPath.split("/").map(encodeURIComponent).join("/")}`;
 }
@@ -17,8 +26,7 @@ function storageHeaders(contentType?: string) {
   const config = getSupabaseConfig();
   if (!config) throw new Error("Awakening Server is not configured.");
   const headers = new Headers();
-  headers.set("apikey", config.secretKey);
-  headers.set("authorization", `Bearer ${config.secretKey}`);
+  applySupabaseAuthHeaders(headers, config.secretKey);
   if (contentType) headers.set("content-type", contentType);
   return { config, headers };
 }
@@ -37,8 +45,7 @@ export async function supabaseRequest<T>(
   }
 
   const requestHeaders = new Headers(headers);
-  requestHeaders.set("apikey", config.secretKey);
-  requestHeaders.set("authorization", `Bearer ${config.secretKey}`);
+  applySupabaseAuthHeaders(requestHeaders, config.secretKey);
   requestHeaders.set("content-type", "application/json");
   if (prefer) requestHeaders.set("prefer", prefer);
 

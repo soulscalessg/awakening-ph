@@ -9,7 +9,7 @@ if (!url || !secret) throw new Error("Awakening Server credentials are not confi
 
 const headers = {
   apikey: secret,
-  authorization: `Bearer ${secret}`,
+  ...(!secret.startsWith("sb_") && { authorization: `Bearer ${secret}` }),
   "content-type": "application/json",
 };
 
